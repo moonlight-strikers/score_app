@@ -1,0 +1,25 @@
+import java.lang.reflect.Field
+
+try {
+    Class<?> pe = Class.forName("java.lang.ProcessEnvironment")
+    Field envField = pe.getDeclaredField("theEnvironment")
+    envField.setAccessible(true)
+    Map<String, String> env = (Map<String, String>) envField.get(null)
+    if (env.containsKey("ANDROID_PREFS_ROOT") && env.containsKey("ANDROID_USER_HOME")) {
+        env.remove("ANDROID_PREFS_ROOT")
+    }
+    Field caseInsensitiveEnvField = pe.getDeclaredField("theCaseInsensitiveEnvironment")
+    caseInsensitiveEnvField.setAccessible(true)
+    Map<String, String> cienv = (Map<String, String>) caseInsensitiveEnvField.get(null)
+    if (cienv != null) {
+        cienv.remove("ANDROID_PREFS_ROOT")
+    }
+} catch (Throwable ignored) {
+    // Ignore if reflection is blocked or unavailable
+}
+
+include ':app'
+include ':capacitor-cordova-android-plugins'
+project(':capacitor-cordova-android-plugins').projectDir = new File('./capacitor-cordova-android-plugins/')
+
+apply from: 'capacitor.settings.gradle'

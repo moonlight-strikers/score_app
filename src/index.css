@@ -1,0 +1,687 @@
+@import "tailwindcss";
+
+/* ======================================================
+   MOONLIGHT STRIKERS — Design Token System
+   ====================================================== */
+
+:root {
+  --ms-bg-primary: #0a0f1e;
+  --ms-bg-secondary: #111827;
+  --ms-bg-card: #162032;
+  --ms-bg-elevated: #1c2a42;
+  --ms-bg-input: #0f1729;
+
+  --ms-text-primary: #f0f4f8;
+  --ms-text-secondary: #94a3b8;
+  --ms-text-muted: #64748b;
+  --ms-text-inverse: #0a0f1e;
+
+  --ms-cyan: #06b6d4;
+  --ms-cyan-light: #22d3ee;
+  --ms-cyan-dark: #0891b2;
+  --ms-cyan-glow: rgba(6, 182, 212, 0.25);
+  --ms-cyan-subtle: rgba(6, 182, 212, 0.08);
+
+  --ms-live: #ef4444;
+  --ms-live-glow: rgba(239, 68, 68, 0.35);
+
+  --ms-boundary: #f59e0b;
+  --ms-six: #a855f7;
+  --ms-wicket: #ef4444;
+  --ms-wicket-glow: rgba(239, 68, 68, 0.25);
+  --ms-dot: #475569;
+  --ms-extra: #3b82f6;
+
+  --ms-border: #1e293b;
+  --ms-border-light: #334155;
+
+  --ms-success: #22c55e;
+  --ms-warning: #f59e0b;
+  --ms-danger: #ef4444;
+}
+
+[data-theme="light"], .light {
+  --ms-bg-primary: #f8fafc;
+  --ms-bg-secondary: #ffffff;
+  --ms-bg-card: #ffffff;
+  --ms-bg-elevated: #f1f5f9;
+  --ms-bg-input: #f8fafc;
+
+  --ms-text-primary: #0f172a;
+  --ms-text-secondary: #334155;
+  --ms-text-muted: #64748b;
+  --ms-text-inverse: #ffffff;
+
+  --ms-cyan: #0284c7;
+  --ms-cyan-light: #38bdf8;
+  --ms-cyan-dark: #0369a1;
+  --ms-cyan-glow: rgba(2, 132, 199, 0.25);
+  --ms-cyan-subtle: rgba(2, 132, 199, 0.1);
+
+  --ms-live: #dc2626;
+  --ms-live-glow: rgba(220, 38, 38, 0.35);
+
+  --ms-boundary: #d97706;
+  --ms-six: #7e22ce;
+  --ms-wicket: #dc2626;
+  --ms-wicket-glow: rgba(220, 38, 38, 0.25);
+  --ms-dot: #64748b;
+  --ms-extra: #2563eb;
+
+  --ms-border: #cbd5e1;
+  --ms-border-light: #94a3b8;
+
+  --ms-success: #16a34a;
+  --ms-warning: #d97706;
+  --ms-danger: #dc2626;
+}
+
+@theme {
+  /* ── Background surfaces ── */
+  --color-ms-bg-primary: var(--ms-bg-primary);
+  --color-ms-bg-secondary: var(--ms-bg-secondary);
+  --color-ms-bg-card: var(--ms-bg-card);
+  --color-ms-bg-elevated: var(--ms-bg-elevated);
+  --color-ms-bg-input: var(--ms-bg-input);
+
+  /* ── Text ── */
+  --color-ms-text-primary: var(--ms-text-primary);
+  --color-ms-text-secondary: var(--ms-text-secondary);
+  --color-ms-text-muted: var(--ms-text-muted);
+  --color-ms-text-inverse: var(--ms-text-inverse);
+
+  /* ── Accent: Electric Cyan ── */
+  --color-ms-cyan: var(--ms-cyan);
+  --color-ms-cyan-light: var(--ms-cyan-light);
+  --color-ms-cyan-dark: var(--ms-cyan-dark);
+  --color-ms-cyan-glow: var(--ms-cyan-glow);
+  --color-ms-cyan-subtle: var(--ms-cyan-subtle);
+
+  /* ── Live indicator: Lime ── */
+  --color-ms-live: var(--ms-live);
+  --color-ms-live-glow: var(--ms-live-glow);
+
+  /* ── Scoring colours ── */
+  --color-ms-boundary: var(--ms-boundary);
+  --color-ms-six: var(--ms-six);
+  --color-ms-wicket: var(--ms-wicket);
+  --color-ms-wicket-glow: var(--ms-wicket-glow);
+  --color-ms-dot: var(--ms-dot);
+  --color-ms-extra: var(--ms-extra);
+
+  /* ── Borders ── */
+  --color-ms-border: var(--ms-border);
+  --color-ms-border-light: var(--ms-border-light);
+
+  /* ── Success / Warning / Danger ── */
+  --color-ms-success: var(--ms-success);
+  --color-ms-warning: var(--ms-warning);
+  --color-ms-danger: var(--ms-danger);
+
+  /* ── Typography ── */
+  --font-display: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-score: 'Inter', 'Tabular Nums', system-ui, monospace;
+
+
+  /* ── Border radius ── */
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+}
+
+/* ======================================================
+   Global resets & base
+   ====================================================== */
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  font-size: 110%; /* Overall 10% increase to text size across all components */
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+  overflow-x: hidden;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: var(--font-display);
+  background-color: var(--color-ms-bg-primary);
+  color: var(--color-ms-text-primary);
+  min-height: 100vh;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+}
+
+#root {
+  min-height: 100vh;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--color-ms-bg-primary);
+  overflow-x: hidden;
+}
+
+/* Safe area for mobile / Capacitor */
+.safe-area-top {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* ======================================================
+   Utility classes for MoonLight Strikers
+   ====================================================== */
+
+/* Card surface — unified with Scoring Page reference */
+.ms-card {
+  background-color: var(--color-ms-bg-card);
+  border: 1px solid var(--color-ms-border);
+  border-radius: 1rem; /* rounded-2xl matching Scoring page */
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  margin-inline: 0 !important;
+  overflow: hidden;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.ms-card-elevated {
+  background-color: var(--color-ms-bg-elevated);
+  border: 1px solid var(--color-ms-border-light);
+  border-radius: 1rem;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  margin-inline: 0 !important;
+  overflow: hidden;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+}
+
+/* Score typography */
+.ms-score-large {
+  font-family: var(--font-score);
+  font-size: 3.5rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.ms-score-medium {
+  font-family: var(--font-score);
+  font-size: 2rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.ms-score-small {
+  font-family: var(--font-score);
+  font-size: 1.25rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* LIVE indicator pulse */
+@keyframes live-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.ms-live-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.125rem 0.45rem;
+  background-color: rgba(239, 68, 68, 0.15);
+  border: 1px solid var(--color-ms-live);
+  border-radius: 9999px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-ms-live);
+}
+
+.ms-live-dot {
+  width: 0.35rem;
+  height: 0.35rem;
+  border-radius: 9999px;
+  background-color: var(--color-ms-live);
+  animation: live-pulse 1.5s ease-in-out infinite;
+}
+
+/* Ball delivery circles */
+.ms-ball {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+.ms-ball-dot {
+  background-color: var(--color-ms-dot);
+  color: var(--color-ms-text-secondary);
+}
+
+.ms-ball-run {
+  background-color: var(--color-ms-bg-elevated);
+  color: var(--color-ms-text-primary);
+  border: 1px solid var(--color-ms-border-light);
+}
+
+.ms-ball-four {
+  background-color: rgba(245, 158, 11, 0.15);
+  color: var(--color-ms-boundary);
+  border: 1px solid var(--color-ms-boundary);
+}
+
+.ms-ball-six {
+  background-color: rgba(168, 85, 247, 0.15);
+  color: var(--color-ms-six);
+  border: 1px solid var(--color-ms-six);
+}
+
+.ms-ball-wicket {
+  background-color: rgba(239, 68, 68, 0.15);
+  color: var(--color-ms-wicket);
+  border: 1px solid var(--color-ms-wicket);
+}
+
+.ms-ball-wide,
+.ms-ball-noball {
+  background-color: rgba(59, 130, 246, 0.15);
+  color: var(--color-ms-extra);
+  border: 1px solid var(--color-ms-extra);
+}
+
+/* Interactive button base */
+.ms-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.875rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  border-radius: var(--radius-md);
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-decoration: none;
+  line-height: 1.25;
+}
+
+.ms-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.ms-btn-primary {
+  background-color: var(--color-ms-cyan);
+  color: var(--color-ms-text-inverse);
+}
+
+.ms-btn-primary:hover:not(:disabled) {
+  background-color: var(--color-ms-cyan-light);
+}
+
+.ms-btn-secondary {
+  background-color: var(--color-ms-bg-elevated);
+  color: var(--color-ms-text-primary);
+  border: 1px solid var(--color-ms-border-light);
+}
+
+.ms-btn-secondary:hover:not(:disabled) {
+  background-color: var(--color-ms-border-light);
+}
+
+.ms-btn-danger {
+  background-color: var(--color-ms-danger);
+  color: white;
+}
+
+.ms-btn-danger:hover:not(:disabled) {
+  background-color: #dc2626;
+}
+
+.ms-btn-ghost {
+  background: transparent;
+  color: var(--color-ms-text-secondary);
+}
+
+.ms-btn-ghost:hover:not(:disabled) {
+  color: var(--color-ms-text-primary);
+  background-color: var(--color-ms-cyan-subtle);
+}
+
+/* Input fields */
+.ms-input {
+  width: 100%;
+  padding: 0.625rem 0.875rem;
+  background-color: var(--color-ms-bg-input);
+  border: 1px solid var(--color-ms-border-light);
+  border-radius: var(--radius-md);
+  color: var(--color-ms-text-primary);
+  font-size: 0.875rem;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.ms-input::placeholder {
+  color: var(--color-ms-text-muted);
+}
+
+.ms-input:focus {
+  border-color: var(--color-ms-cyan);
+  box-shadow: 0 0 0 2px var(--color-ms-cyan-glow);
+}
+
+.ms-input-label {
+  display: block;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--color-ms-text-secondary);
+  margin-bottom: 0.375rem;
+}
+
+/* Select / dropdown */
+.ms-select {
+  width: 100%;
+  padding: 0.625rem 0.875rem;
+  background-color: var(--color-ms-bg-input);
+  border: 1px solid var(--color-ms-border-light);
+  border-radius: var(--radius-md);
+  color: var(--color-ms-text-primary);
+  font-size: 0.875rem;
+  outline: none;
+  appearance: none;
+  cursor: pointer;
+}
+
+.ms-select:focus {
+  border-color: var(--color-ms-cyan);
+  box-shadow: 0 0 0 2px var(--color-ms-cyan-glow);
+}
+
+/* Mobile Segmented Control — sleek 1-tap selectors instead of boxy dropdowns */
+.ms-segmented {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+  padding: 0.25rem;
+  background-color: var(--color-ms-bg-input);
+  border: 1px solid var(--color-ms-border);
+  border-radius: var(--radius-lg);
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.ms-segmented-item {
+  width: 100%;
+  padding: 0.625rem 0.75rem;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-ms-border-light);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  color: var(--color-ms-text-secondary);
+  background-color: var(--color-ms-bg-card);
+  outline: none;
+  box-sizing: border-box;
+}
+
+.ms-segmented-item:hover {
+  color: var(--color-ms-text-primary);
+  background-color: var(--color-ms-bg-elevated);
+  border-color: var(--color-ms-cyan-light);
+}
+
+/* Active state must stay vibrantly visible on click, hover, focus, and touch */
+.ms-segmented-item.ms-segmented-item-active,
+.ms-segmented-item.ms-segmented-item-active:hover,
+.ms-segmented-item.ms-segmented-item-active:focus,
+.ms-segmented-item.ms-segmented-item-active:focus-visible,
+.ms-segmented-item.ms-segmented-item-active:active {
+  background-color: var(--color-ms-cyan) !important;
+  color: var(--color-ms-text-inverse) !important;
+  border-color: var(--color-ms-cyan) !important;
+  box-shadow: 0 1px 4px var(--color-ms-cyan-glow) !important;
+}
+
+.ms-segmented-item.ms-segmented-item-active * {
+  color: var(--color-ms-text-inverse) !important;
+}
+
+/* Table styling */
+.ms-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+}
+
+.ms-table th {
+  padding: 0.625rem 0.75rem;
+  text-align: left;
+  font-weight: 600;
+  color: var(--color-ms-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: 0.6875rem;
+  border-bottom: 1px solid var(--color-ms-border-light);
+  background-color: rgba(255, 255, 255, 0.02);
+}
+
+.ms-table td {
+  padding: 0.625rem 0.75rem;
+  border-bottom: 1px solid var(--color-ms-border);
+  color: var(--color-ms-text-primary);
+}
+
+.ms-table tbody tr:hover {
+  background-color: var(--color-ms-cyan-subtle);
+}
+
+/* Tab navigation */
+.ms-tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--color-ms-border);
+}
+
+.ms-tab {
+  padding: 0.75rem 1.25rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--color-ms-text-muted);
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.ms-tab:hover {
+  color: var(--color-ms-text-primary);
+}
+
+.ms-tab-active {
+  color: var(--color-ms-cyan);
+  border-bottom-color: var(--color-ms-cyan);
+}
+
+/* Bottom navigation (mobile) */
+.ms-bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  display: flex;
+  align-items: stretch;
+  background-color: var(--color-ms-bg-secondary);
+  border-top: 1px solid var(--color-ms-border);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.ms-bottom-nav-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  padding: 0.5rem 0;
+  font-size: 0.625rem;
+  font-weight: 500;
+  color: var(--color-ms-text-muted);
+  text-decoration: none;
+  transition: color 0.15s ease;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+.ms-bottom-nav-item:hover,
+.ms-bottom-nav-item-active {
+  color: var(--color-ms-cyan);
+}
+
+.ms-bottom-nav-item svg {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+/* Scrollbar styling — hidden on mobile touch devices to eliminate unwanted track bars */
+::-webkit-scrollbar {
+  display: none;
+  width: 0px;
+  height: 0px;
+}
+
+* {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Page layout - identical to scoring screen: 500px max, equal side padding, perfectly centered */
+.ms-page,
+.ms-scoring-screen {
+  width: 100%;
+  max-width: 500px;
+  margin-left: auto !important;
+  margin-right: auto !important;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.375rem 0.625rem 0.75rem 0.625rem;
+  box-sizing: border-box;
+  min-width: 0;
+}
+
+@media (min-width: 768px) {
+  .ms-page,
+  .ms-scoring-screen {
+    max-width: 520px;
+    padding: 0.75rem 1rem 1rem 1rem;
+    gap: 0.625rem;
+  }
+}
+
+.ms-page-wide {
+  max-width: 500px;
+}
+
+/* Empty state */
+.ms-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 1.75rem 1rem;
+  text-align: center;
+  color: var(--color-ms-text-muted);
+}
+
+.ms-empty-state svg {
+  width: 1.75rem;
+  height: 1.75rem;
+  margin-bottom: 0.5rem;
+  opacity: 0.5;
+}
+
+/* Loading spinner */
+@keyframes ms-spin {
+  to { transform: rotate(360deg); }
+}
+
+.ms-spinner {
+  width: 1.5rem;
+  height: 1.5rem;
+  border: 2px solid var(--color-ms-border-light);
+  border-top-color: var(--color-ms-cyan);
+  border-radius: 50%;
+  animation: ms-spin 0.6s linear infinite;
+}
+
+/* Badges */
+.ms-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.125rem 0.5rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  border-radius: 9999px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.ms-badge-cyan {
+  background-color: var(--color-ms-cyan-subtle);
+  color: var(--color-ms-cyan);
+  border: 1px solid rgba(6, 182, 212, 0.3);
+}
+
+.ms-badge-success {
+  background-color: rgba(34, 197, 94, 0.1);
+  color: var(--color-ms-success);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.ms-badge-warning {
+  background-color: rgba(245, 158, 11, 0.1);
+  color: var(--color-ms-warning);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.ms-badge-danger {
+  background-color: rgba(239, 68, 68, 0.1);
+  color: var(--color-ms-danger);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
