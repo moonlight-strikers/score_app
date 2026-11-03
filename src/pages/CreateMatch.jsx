@@ -4,6 +4,7 @@ import { matchService } from '../services/matchService';
 import { inningsService } from '../services/inningsService';
 import Stepper, { Step } from '../components/Stepper';
 import { useTheme } from '../contexts/ThemeContext';
+import { useLanguage } from '../contexts/LanguageContext';
 import {
   Trophy,
   Shield,
@@ -19,6 +20,7 @@ import {
 export default function CreateMatch() {
   const navigate = useNavigate();
   const { theme } = useTheme();
+  const { t } = useLanguage();
   const [loading, setLoading] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
   const [error, setError] = useState('');
@@ -267,9 +269,9 @@ export default function CreateMatch() {
         />
         <div>
           <h1 className="text-xl font-bold text-ms-text-primary tracking-tight">
-            Create Match
+            {t('createMatch.title')}
           </h1>
-          <p className="text-[11px] text-ms-text-muted">Set up your fixture in 3 easy steps</p>
+          <p className="text-[11px] text-ms-text-muted">{t('createMatch.subtitle')}</p>
         </div>
       </div>
 
@@ -295,13 +297,13 @@ export default function CreateMatch() {
           {/* ============================================================ */}
           {/* STEP 1 – MATCH CONFIGURATION                                 */}
           {/* ============================================================ */}
-          <Step title="Configuration">
+          <Step title={t('createMatch.step1Title')}>
             <div className="flex flex-col gap-3.5 w-full pt-1">
               {/* Match Format Card */}
               <div className="ms-card p-3.5 border-ms-border-light bg-ms-bg-card shadow-sm rounded-2xl">
                 <h2 className="text-xs font-bold text-ms-cyan uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
                   <Trophy className="w-3.5 h-3.5 text-black dark:text-white" />
-                  <span>Match Format</span>
+                  <span>{t('createMatch.matchFormat')}</span>
                 </h2>
 
                 <div className="grid grid-cols-2 gap-2">
@@ -320,7 +322,7 @@ export default function CreateMatch() {
                     }`}
                   >
                     <Zap className="w-3.5 h-3.5 text-black dark:text-white" />
-                    <span className="font-bold text-xs sm:text-sm">Limited Overs</span>
+                    <span className="font-bold text-xs sm:text-sm">{t('createMatch.limitedOvers')}</span>
                   </button>
 
                   <button
@@ -339,7 +341,7 @@ export default function CreateMatch() {
                     }`}
                   >
                     <Shield className="w-3.5 h-3.5 text-black dark:text-white" />
-                    <span className="font-bold text-xs sm:text-sm">Test Match</span>
+                    <span className="font-bold text-xs sm:text-sm">{t('createMatch.testMatch')}</span>
                   </button>
                 </div>
               </div>
@@ -349,7 +351,7 @@ export default function CreateMatch() {
                 <div className="ms-card p-3.5 border-ms-border-light bg-ms-bg-card shadow-sm rounded-2xl">
                   <h2 className="text-xs font-bold text-ms-cyan uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
                     <Sparkles className="w-3.5 h-3.5 text-black dark:text-white" />
-                    <span>Match Overs</span>
+                    <span>{t('createMatch.matchOvers')}</span>
                   </h2>
 
                   <div className="space-y-3">
@@ -372,7 +374,7 @@ export default function CreateMatch() {
 
                     <div className="pt-0.5">
                       <label className="ms-input-label text-xs font-semibold text-slate-700 dark:text-slate-300">
-                        Or Custom Overs
+                        {t('createMatch.customOvers')}
                       </label>
                       <input
                         type="number"
@@ -382,7 +384,7 @@ export default function CreateMatch() {
                         value={formData.overs}
                         onChange={handleChange}
                         required
-                        placeholder="Enter custom overs"
+                        placeholder={t('createMatch.enterCustomOvers')}
                         className="ms-input text-base py-2 font-score tabular-nums font-bold text-slate-900 dark:text-white rounded-xl"
                       />
                     </div>
@@ -394,7 +396,7 @@ export default function CreateMatch() {
                   <div className="ms-card p-3.5 border-ms-border-light bg-ms-bg-card shadow-sm rounded-2xl">
                     <h2 className="text-xs font-bold text-ms-cyan uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
                       <Layers className="w-3.5 h-3.5 text-black dark:text-white" />
-                      <span>Number of Innings</span>
+                      <span>{t('createMatch.numberOfInnings')}</span>
                     </h2>
 
                     <div className="grid grid-cols-3 gap-2">
@@ -409,7 +411,7 @@ export default function CreateMatch() {
                               : 'bg-ms-bg-input border-ms-border text-slate-900 dark:text-white hover:text-cyan-600 dark:hover:text-cyan-400'
                           }`}
                         >
-                          {inn} Innings
+                          {inn} {t('common.innings')}
                         </button>
                       ))}
                     </div>
@@ -419,7 +421,7 @@ export default function CreateMatch() {
                   <div className="ms-card p-3.5 border-ms-border-light bg-ms-bg-card shadow-sm rounded-2xl">
                     <h2 className="text-xs font-bold text-ms-cyan uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
                       <Sparkles className="w-3.5 h-3.5 text-black dark:text-white" />
-                      <span>Overs Per Innings</span>
+                      <span>{t('createMatch.oversPerInnings')}</span>
                     </h2>
 
                     <div className="space-y-3">
@@ -442,7 +444,7 @@ export default function CreateMatch() {
 
                       <div className="pt-0.5">
                         <label className="ms-input-label text-xs font-semibold text-slate-700 dark:text-slate-300">
-                          Custom Overs Per Innings
+                          {t('createMatch.customOversPerInnings')}
                         </label>
                         <input
                           type="number"
@@ -452,7 +454,7 @@ export default function CreateMatch() {
                           value={formData.overs}
                           onChange={handleChange}
                           required
-                          placeholder="Enter custom overs per innings"
+                          placeholder={t('createMatch.enterCustomOversPerInnings')}
                           className="ms-input text-base py-2 font-score tabular-nums font-bold text-slate-900 dark:text-white rounded-xl"
                         />
                       </div>
@@ -468,7 +470,7 @@ export default function CreateMatch() {
                   onClick={handleNext}
                   className="ms-btn ms-btn-primary w-full py-3.5 sm:py-4 text-sm sm:text-base font-black shadow-lg shadow-cyan-900/30 flex items-center justify-center gap-2.5 cursor-pointer rounded-2xl active:scale-[0.98] transition-all tracking-wide"
                 >
-                  <span>Continue to Teams</span>
+                  <span>{t('createMatch.continueToTeams')}</span>
                   <ArrowRight className="w-5 h-5 text-black dark:text-white" />
                 </button>
               </div>
@@ -478,37 +480,37 @@ export default function CreateMatch() {
           {/* ============================================================ */}
           {/* STEP 2 – TEAMS & TOSS                                        */}
           {/* ============================================================ */}
-          <Step title="Teams & Toss">
+          <Step title={t('createMatch.step2Title')}>
             <div className="flex flex-col gap-3.5 w-full pt-1">
               <div className="ms-card p-3.5 border-ms-border-light bg-ms-bg-card shadow-sm rounded-2xl">
                 <h2 className="text-xs font-bold text-ms-cyan uppercase tracking-wider mb-3 flex items-center gap-1.5">
                   <Shield className="w-3.5 h-3.5 text-black dark:text-white" />
-                  <span>Team Names</span>
+                  <span>{t('createMatch.teamNames')}</span>
                 </h2>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="ms-input-label text-xs font-semibold">Team A Name</label>
+                    <label className="ms-input-label text-xs font-semibold">{t('createMatch.teamAName')}</label>
                     <input
                       type="text"
                       name="team_a_name"
                       value={formData.team_a_name}
                       onChange={handleChange}
                       required
-                      placeholder="e.g. Team A"
+                      placeholder={t('createMatch.teamAPlaceholder')}
                       className="ms-input text-xs sm:text-sm py-2 rounded-xl"
                     />
                   </div>
 
                   <div>
-                    <label className="ms-input-label text-xs font-semibold">Team B Name</label>
+                    <label className="ms-input-label text-xs font-semibold">{t('createMatch.teamBName')}</label>
                     <input
                       type="text"
                       name="team_b_name"
                       value={formData.team_b_name}
                       onChange={handleChange}
                       required
-                      placeholder="e.g. Team B"
+                      placeholder={t('createMatch.teamBPlaceholder')}
                       className="ms-input text-xs sm:text-sm py-2 rounded-xl"
                     />
                   </div>
@@ -516,7 +518,7 @@ export default function CreateMatch() {
 
                 {/* Toss Won By — Segmented Selection */}
                 <div className="space-y-1.5 pt-3 border-t border-ms-border/50 mt-3">
-                  <label className="ms-input-label text-xs font-semibold">Toss Won By</label>
+                  <label className="ms-input-label text-xs font-semibold">{t('createMatch.tossWinner')}</label>
                   <div className="ms-segmented">
                     <button
                       type="button"
@@ -547,7 +549,7 @@ export default function CreateMatch() {
 
                 {/* Toss Decision — Segmented Selection */}
                 <div className="space-y-1.5 pt-2">
-                  <label className="ms-input-label text-xs font-semibold">Toss Decision</label>
+                  <label className="ms-input-label text-xs font-semibold">{t('createMatch.tossDecision')}</label>
                   <div className="ms-segmented">
                     <button
                       type="button"
@@ -556,7 +558,7 @@ export default function CreateMatch() {
                         formData.toss_decision !== 'bowl' ? 'ms-segmented-item-active' : ''
                       }`}
                     >
-                      <span className="font-bold text-xs sm:text-sm">🏏 Bat First</span>
+                      <span className="font-bold text-xs sm:text-sm">🏏 {t('createMatch.batFirst')}</span>
                     </button>
                     <button
                       type="button"
@@ -565,7 +567,7 @@ export default function CreateMatch() {
                         formData.toss_decision === 'bowl' ? 'ms-segmented-item-active' : ''
                       }`}
                     >
-                      <span className="font-bold text-xs sm:text-sm">⚾ Bowl First</span>
+                      <span className="font-bold text-xs sm:text-sm">⚾ {t('createMatch.bowlFirst')}</span>
                     </button>
                   </div>
                 </div>
@@ -579,14 +581,14 @@ export default function CreateMatch() {
                   className="ms-btn ms-btn-secondary py-3.5 sm:py-4 px-5 text-sm sm:text-base font-bold flex items-center justify-center gap-1.5 cursor-pointer rounded-2xl active:scale-[0.98] transition-all flex-none"
                 >
                   <ArrowLeft className="w-4 h-4" />
-                  <span>Back</span>
+                  <span>{t('common.back')}</span>
                 </button>
                 <button
                   type="button"
                   onClick={handleNext}
                   className="ms-btn ms-btn-primary flex-1 py-3.5 sm:py-4 text-sm sm:text-base font-black shadow-lg shadow-cyan-900/30 flex items-center justify-center gap-2.5 cursor-pointer rounded-2xl active:scale-[0.98] transition-all tracking-wide"
                 >
-                  <span>Continue to Players</span>
+                  <span>{t('createMatch.continueToPlayers')}</span>
                   <ArrowRight className="w-5 h-5 text-black dark:text-white" />
                 </button>
               </div>
@@ -596,50 +598,50 @@ export default function CreateMatch() {
           {/* ============================================================ */}
           {/* STEP 3 – OPENING PLAYERS                                     */}
           {/* ============================================================ */}
-          <Step title="Opening Players">
+          <Step title={t('createMatch.step3Title')}>
             <div className="flex flex-col gap-3.5 w-full pt-1">
               <div className="ms-card p-3.5 border-ms-border-light bg-ms-bg-card rounded-2xl shadow-sm">
                 <h2 className="text-xs font-bold text-ms-cyan uppercase tracking-wider mb-3 flex items-center gap-1.5">
                   <User className="w-3.5 h-3.5 text-black dark:text-white" />
-                  <span>Opening Lineup</span>
+                  <span>{t('createMatch.openingLineup')}</span>
                 </h2>
 
                 <div className="space-y-3">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                      <label className="ms-input-label text-xs font-semibold">Striker (*)</label>
+                      <label className="ms-input-label text-xs font-semibold">{t('createMatch.striker')}</label>
                       <input
                         type="text"
                         name="striker_name"
                         value={formData.striker_name}
                         onChange={handleChange}
                         required
-                        placeholder="e.g. VIRAT"
+                        placeholder={t('createMatch.strikerPlaceholder')}
                         className="ms-input text-xs sm:text-sm uppercase py-2 rounded-xl"
                       />
                     </div>
 
                     <div>
-                      <label className="ms-input-label text-xs font-semibold">Non-Striker</label>
+                      <label className="ms-input-label text-xs font-semibold">{t('createMatch.nonStriker')}</label>
                       <input
                         type="text"
                         name="non_striker_name"
                         value={formData.non_striker_name}
                         onChange={handleChange}
-                        placeholder="e.g. ROHIT"
+                        placeholder={t('createMatch.nonStrikerPlaceholder')}
                         className="ms-input text-xs sm:text-sm uppercase py-2 rounded-xl"
                       />
                     </div>
                   </div>
 
                   <div>
-                    <label className="ms-input-label text-xs font-semibold">Opening Bowler</label>
+                    <label className="ms-input-label text-xs font-semibold">{t('createMatch.openingBowler')}</label>
                     <input
                       type="text"
                       name="opening_bowler_name"
                       value={formData.opening_bowler_name}
                       onChange={handleChange}
-                      placeholder="e.g. BUMRAH"
+                      placeholder={t('createMatch.bowlerPlaceholder')}
                       className="ms-input text-xs sm:text-sm uppercase py-2 rounded-xl"
                     />
                   </div>
@@ -649,11 +651,11 @@ export default function CreateMatch() {
               {/* Match Details Preview Summary */}
               <div className="p-3 bg-[#0d172b] border border-cyan-500/20 rounded-xl text-xs space-y-1 text-slate-300">
                 <div className="flex justify-between font-bold text-white">
-                  <span>{formData.team_a_name || 'Team A'} vs {formData.team_b_name || 'Team B'}</span>
-                  <span className="text-cyan-400 capitalize">{formData.match_type === 'test' ? `Test (${formData.configured_innings} Inn)` : `${formData.overs} Overs`}</span>
+                  <span>{formData.team_a_name || 'Team A'} {t('common.vs')} {formData.team_b_name || 'Team B'}</span>
+                  <span className="text-cyan-400 capitalize">{formData.match_type === 'test' ? `${t('createMatch.testMatch')} (${formData.configured_innings} ${t('common.innings')})` : `${formData.overs} ${t('common.overs')}`}</span>
                 </div>
                 <div className="text-[11px] text-slate-400">
-                  Toss: <strong className="text-slate-200">{formData.toss_winner || formData.team_a_name}</strong> chose to <strong className="text-slate-200">{formData.toss_decision === 'bat' ? 'Bat First' : 'Bowl First'}</strong>
+                  {t('createMatch.tossResultPrefix')} <strong className="text-slate-200">{formData.toss_winner || formData.team_a_name}</strong> {t('createMatch.choseTo')} <strong className="text-slate-200">{formData.toss_decision === 'bat' ? t('createMatch.batFirst') : t('createMatch.bowlFirst')}</strong>
                 </div>
               </div>
 
@@ -666,14 +668,14 @@ export default function CreateMatch() {
                   className="ms-btn ms-btn-secondary py-3.5 sm:py-4 px-5 text-sm sm:text-base font-bold flex items-center justify-center gap-1.5 cursor-pointer rounded-2xl active:scale-[0.98] transition-all flex-none"
                 >
                   <ArrowLeft className="w-4 h-4" />
-                  <span>Back</span>
+                  <span>{t('common.back')}</span>
                 </button>
                 <button
                   type="submit"
                   disabled={loading}
                   className="ms-btn ms-btn-primary flex-1 py-3.5 sm:py-4 text-sm sm:text-base font-black shadow-lg shadow-cyan-900/30 flex items-center justify-center gap-2.5 cursor-pointer rounded-2xl active:scale-[0.98] transition-all disabled:opacity-50 tracking-wide"
                 >
-                  <span>{loading ? 'Creating Match...' : 'Start Match'}</span>
+                  <span>{loading ? t('createMatch.creatingMatch') : t('createMatch.startMatch')}</span>
                   <Sparkles className="w-5 h-5 text-black dark:text-white" />
                 </button>
               </div>

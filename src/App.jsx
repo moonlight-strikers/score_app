@@ -5,6 +5,8 @@ import TopNav from './components/TopNav';
 import BottomNav from './components/BottomNav';
 import SplashScreen from './components/SplashScreen';
 import { useTheme } from './contexts/ThemeContext';
+import { useLanguage } from './contexts/LanguageContext';
+import LanguageSwitcher from './components/LanguageSwitcher';
 
 // Pages
 import Home from './pages/Home';
@@ -17,6 +19,7 @@ import Toss from './pages/Toss';
 
 export default function App() {
   const { theme, toggleTheme } = useTheme();
+  const { t } = useLanguage();
   const [showSplash, setShowSplash] = useState(() => {
     try {
       return !sessionStorage.getItem('ms_splash_seen');
@@ -51,25 +54,28 @@ export default function App() {
             <span className="text-[10px] font-score tabular-nums text-slate-400 tracking-wider">v1.1.0</span>
           </div>
         </Link>
-        <button
-          type="button"
-          onClick={toggleTheme}
-          className="p-1.5 rounded-lg bg-ms-bg-card border border-ms-border text-ms-text-secondary hover:text-ms-text-primary transition-all cursor-pointer flex items-center gap-1.5 text-xs font-semibold"
-          title={theme === 'dark' ? 'Switch to Light Theme' : 'Switch to Dark Theme'}
-          aria-label="Toggle theme"
-        >
-          {theme === 'dark' ? (
-            <>
-              <Sun className="w-4 h-4 text-amber-400" />
-              <span className="text-[11px] text-ms-text-primary">Light</span>
-            </>
-          ) : (
-            <>
-              <Moon className="w-4 h-4 text-slate-800 dark:text-slate-200" />
-              <span className="text-[11px] text-ms-text-primary">Dark</span>
-            </>
-          )}
-        </button>
+        <div className="flex items-center gap-1.5">
+          <LanguageSwitcher />
+          <button
+            type="button"
+            onClick={toggleTheme}
+            className="p-1.5 rounded-lg bg-ms-bg-card border border-ms-border text-ms-text-secondary hover:text-ms-text-primary transition-all cursor-pointer flex items-center gap-1.5 text-xs font-semibold"
+            title={theme === 'dark' ? t('header.switchToLight') : t('header.switchToDark')}
+            aria-label="Toggle theme"
+          >
+            {theme === 'dark' ? (
+              <>
+                <Sun className="w-4 h-4 text-amber-400" />
+                <span className="text-[11px] text-ms-text-primary">Light</span>
+              </>
+            ) : (
+              <>
+                <Moon className="w-4 h-4 text-slate-800 dark:text-slate-200" />
+                <span className="text-[11px] text-ms-text-primary">Dark</span>
+              </>
+            )}
+          </button>
+        </div>
       </header>
 
       {/* Main Centered Content */}

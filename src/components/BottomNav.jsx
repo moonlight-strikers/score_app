@@ -8,15 +8,18 @@ import {
   BarChart3,
 } from 'lucide-react';
 
+import { useLanguage } from '../contexts/LanguageContext';
+
 const navItems = [
-  { label: 'Home', path: '/', icon: Home },
-  { label: 'Matches', path: '/matches', icon: Trophy },
-  { label: 'Toss', path: '/toss', icon: Coins },
-  { label: 'Live', path: '/live', icon: Radio },
-  { label: 'Records', path: '/records', icon: BarChart3 },
+  { key: 'home', path: '/', icon: Home },
+  { key: 'matches', path: '/matches', icon: Trophy },
+  { key: 'toss', path: '/toss', icon: Coins },
+  { key: 'live', path: '/live', icon: Radio },
+  { key: 'records', path: '/records', icon: BarChart3 },
 ];
 
 export default function BottomNav() {
+  const { t } = useLanguage();
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
 
   useEffect(() => {
@@ -96,7 +99,7 @@ export default function BottomNav() {
           }
         >
           <item.icon />
-          <span>{item.label}</span>
+          <span>{t(`nav.${item.key}`)}</span>
         </NavLink>
       ))}
     </nav>
