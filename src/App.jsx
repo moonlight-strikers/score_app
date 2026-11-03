@@ -43,7 +43,7 @@ export default function App() {
       <TopNav />
 
       {/* Mobile Sticky Top Header with Theme Switcher & Version */}
-      <header className="md:hidden flex items-center justify-between px-4 py-1.5 min-h-[50px] bg-ms-bg-secondary border-b border-ms-border sticky top-0 z-40 safe-area-top shadow-xs">
+      <header className="md:hidden flex items-center justify-between px-4 py-1.5 min-h-[50px] bg-white dark:bg-[#111827] border-b border-slate-200 dark:border-ms-border sticky top-0 z-40 safe-area-top shadow-xs">
         <Link to="/" className="flex items-center gap-2.5 text-ms-cyan no-underline">
           <img src="/logo.png" alt="MoonLight Strikers" className="w-8 h-8 rounded-full object-cover border border-cyan-400/40 shadow-xs flex-shrink-0" />
           <div className="flex flex-col leading-tight">

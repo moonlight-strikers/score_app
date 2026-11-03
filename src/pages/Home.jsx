@@ -229,7 +229,7 @@ export default function Home() {
                     {/* Bottom Quick Action Bar inside the card */}
                     <div className="mt-2.5 pt-2 border-t border-ms-border flex items-center justify-between text-xs">
                       <span className="text-[11px] text-ms-text-muted truncate">
-                        {match.venue || 'Saturday Night League'}
+                        {(match.venue && !match.venue.toLowerCase().includes('oval')) ? match.venue : 'Saturday Night League'}
                       </span>
                       <span className="text-ms-cyan font-bold flex items-center gap-0.5 group-hover:translate-x-0.5 transition-transform flex-shrink-0">
                         <span>Score / Watch Live</span>

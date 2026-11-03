@@ -24,7 +24,7 @@ export default function TopNav() {
   const { theme, toggleTheme } = useTheme();
 
   return (
-    <header className="hidden md:block bg-ms-bg-secondary border-b border-ms-border">
+    <header className="hidden md:block bg-white dark:bg-[#111827] border-b border-slate-200 dark:border-ms-border text-slate-900 dark:text-white">
       <div className="max-w-[1200px] mx-auto px-6 h-14 flex items-center justify-between">
         {/* Brand */}
         <NavLink to="/" className="flex items-center gap-2.5 text-ms-cyan no-underline">

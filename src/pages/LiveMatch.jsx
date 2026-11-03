@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import Scoreboard from '../components/Scoreboard';
 import ScoringPad from '../components/ScoringPad';
@@ -40,6 +40,7 @@ export default function LiveMatch() {
   const [errorMessage, setErrorMessage] = useState(null);
   const [successMessage, setSuccessMessage] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
+  const isScoringDebounceRef = useRef(false);
   const [isUndoing, setIsUndoing] = useState(false);
   const [undoConfirmModal, setUndoConfirmModal] = useState({
     isOpen: false,
@@ -378,8 +379,12 @@ export default function LiveMatch() {
   };
 
   const handleScoreBall = async ({ runs, type, batsmanRuns = 0, isFour = false, isSix = false }) => {
-    if (isSaving) return;
-    setIsSaving(true);
+    if (isScoringDebounceRef.current) return;
+    isScoringDebounceRef.current = true;
+    setTimeout(() => {
+      isScoringDebounceRef.current = false;
+    }, 60);
+
     setErrorMessage(null);
 
     const isLegal = isLegalDelivery(type);
@@ -432,16 +437,6 @@ export default function LiveMatch() {
       },
       wicket: null
     };
-
-    // 2. Insert into ball_by_ball FIRST. If insert fails, DO NOT update React state.
-    try {
-      await scoringService.recordBall(matchData.id, ballRecord);
-    } catch (err) {
-      console.error('Failed to insert ball:', err);
-      setErrorMessage(`Failed to save ball to database: ${err.message || 'Network error'}`);
-      setIsSaving(false);
-      return;
-    }
 
     pushHistory();
 
@@ -650,26 +645,31 @@ export default function LiveMatch() {
       setShowBowlerModal(true);
     }
 
-    // Synchronize to Supabase innings table and matches table in parallel
-    if (currentInningsId) {
-      inningsService.updateInnings(currentInningsId, {
-        match_id: matchData.id,
-        total_runs: newTotalRuns,
-        wickets: currentWickets,
-        overs_completed: Math.floor(newLegalBalls / 6),
-        balls_completed: newLegalBalls,
-        innings_status: 'live'
-      }).catch(err => console.warn('Innings update sync note:', err));
-    }
+    // Synchronize to Supabase ball_by_ball, innings, and matches tables asynchronously in background
+    (async () => {
+      try {
+        await scoringService.recordBall(matchData.id, ballRecord);
+      } catch (err) {
+        console.warn('Background ball save note:', err);
+      }
 
-    try {
-      await matchService.updateMatch(matchData.id, nextMatchData);
-    } catch (err) {
-      console.warn('Match summary sync note:', err);
-      setErrorMessage(`Match summary sync error: ${err.message}`);
-    } finally {
-      setIsSaving(false);
-    }
+      if (currentInningsId) {
+        inningsService.updateInnings(currentInningsId, {
+          match_id: matchData.id,
+          total_runs: newTotalRuns,
+          wickets: currentWickets,
+          overs_completed: Math.floor(newLegalBalls / 6),
+          balls_completed: newLegalBalls,
+          innings_status: 'live'
+        }).catch(err => console.warn('Innings update sync note:', err));
+      }
+
+      try {
+        await matchService.updateMatch(matchData.id, nextMatchData);
+      } catch (err) {
+        console.warn('Match summary sync note:', err);
+      }
+    })();
   };
 
   const handleWicket = async ({ wicketType, isStriker, newBatter, fielder }) => {
@@ -725,16 +725,6 @@ export default function LiveMatch() {
         fielder: fielder || ''
       }
     };
-
-    // 2. Insert into ball_by_ball FIRST
-    try {
-      await scoringService.recordBall(matchData.id, ballRecord);
-    } catch (err) {
-      console.error('Failed to insert wicket:', err);
-      setErrorMessage(`Failed to save wicket to database: ${err.message || 'Network error'}`);
-      setIsSaving(false);
-      return;
-    }
 
     pushHistory();
 
@@ -917,26 +907,31 @@ export default function LiveMatch() {
       setShowBowlerModal(true);
     }
 
-    // Synchronize to Supabase innings table
-    if (currentInningsId) {
-      inningsService.updateInnings(currentInningsId, {
-        match_id: matchData.id,
-        total_runs: currentRuns,
-        wickets: newWickets,
-        overs_completed: Math.floor(newLegalBalls / 6),
-        balls_completed: newLegalBalls,
-        innings_status: 'live'
-      }).catch(err => console.warn('Innings update sync note:', err));
-    }
+    // Synchronize to Supabase ball_by_ball, innings, and matches tables asynchronously in background
+    (async () => {
+      try {
+        await scoringService.recordBall(matchData.id, ballRecord);
+      } catch (err) {
+        console.warn('Background wicket save note:', err);
+      }
 
-    try {
-      await matchService.updateMatch(matchData.id, nextMatchData);
-    } catch (err) {
-      console.warn('Scoring sync note:', err);
-      setErrorMessage(`Match summary sync error: ${err.message}`);
-    } finally {
-      setIsSaving(false);
-    }
+      if (currentInningsId) {
+        inningsService.updateInnings(currentInningsId, {
+          match_id: matchData.id,
+          total_runs: currentRuns,
+          wickets: newWickets,
+          overs_completed: Math.floor(newLegalBalls / 6),
+          balls_completed: newLegalBalls,
+          innings_status: 'live'
+        }).catch(err => console.warn('Innings update sync note:', err));
+      }
+
+      try {
+        await matchService.updateMatch(matchData.id, nextMatchData);
+      } catch (err) {
+        console.warn('Match summary sync note:', err);
+      }
+    })();
   };
 
   const handleUndo = async () => {

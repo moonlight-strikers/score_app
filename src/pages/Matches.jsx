@@ -163,7 +163,7 @@ export default function Matches() {
                       </span>
                     )}
                     <span className="text-xs text-slate-500 dark:text-slate-400 truncate">
-                      • {m.venue || 'MoonLight Oval'} ({m.match_type === 'test' ? `${m.overs || 20} ov/inn` : `${m.overs || 16} ov`})
+                      {m.venue && !m.venue.toLowerCase().includes('oval') ? `• ${m.venue} ` : ''}({m.match_type === 'test' ? `${m.overs || 20} ov/inn` : `${m.overs || 16} ov`})
                     </span>
                   </div>
 

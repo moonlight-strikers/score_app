@@ -71,7 +71,7 @@ export default function ScoringPad({
   };
 
   return (
-    <div className="w-full bg-[#0d1830] border border-cyan-500/30 rounded-2xl p-3 shadow-xl select-none space-y-2 text-white">
+    <div className="w-full bg-[#0d1830] border border-cyan-500/30 rounded-2xl p-3 shadow-xl select-none space-y-2 text-white touch-manipulation">
       {/* Quick Action Toolbar: Swap Strike, Change Bowler, End Innings */}
       <div className="flex items-center justify-between gap-1.5 pb-2 border-b border-cyan-500/20">
         <div className="flex items-center gap-1.5">

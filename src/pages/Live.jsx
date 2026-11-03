@@ -92,7 +92,7 @@ export default function Live() {
                       LIVE
                     </span>
                     <span className="text-xs text-ms-text-muted truncate">
-                      {match.venue || 'MoonLight Turf'} ({match.overs || 16} ov)
+                      {match.venue && !match.venue.toLowerCase().includes('oval') ? `${match.venue} • ` : ''}({match.overs || 16} ov)
                     </span>
                   </div>
 

@@ -104,8 +104,8 @@ export default function Scoreboard({
         </div>
       )}
 
-      {/* Multi-Innings Score Breakdown (Displays only configured innings for match) */}
-      {allInnings && allInnings.length > 0 && (
+      {/* Multi-Innings Score Breakdown (Displays only for Test Match) */}
+      {isTest && allInnings && allInnings.length > 0 && (
         <div className="p-2.5 rounded-xl border border-slate-200/90 dark:border-cyan-500/30 bg-white/95 dark:bg-[#0a1633]/90 shadow-xs space-y-1">
           {allInnings.map((inn, idx) => {
             const innNum = Number(inn.innings_number || idx + 1);
@@ -185,21 +185,26 @@ export default function Scoreboard({
             </span>
           </div>
 
-          {/* 2. Overs: Directly below main score, Inter Medium with smaller size */}
-          <div className="font-sans font-medium text-xs sm:text-sm text-slate-500 dark:text-slate-300 mt-1 flex items-center justify-center gap-1">
-            <span className="font-score font-semibold tabular-nums text-sm sm:text-base text-slate-700 dark:text-slate-200">{oversFormatted}</span>
-            <span className="text-slate-400 dark:text-slate-500 font-light">/</span>
-            <span className="font-score font-semibold tabular-nums text-sm sm:text-base text-slate-700 dark:text-slate-200">{totalOvers}</span>
-            <span className="text-[11px] font-medium tracking-wider uppercase text-slate-500 dark:text-slate-400 ml-0.5">OV</span>
-          </div>
+          {/* 2. Overs, CRR, and RRR: Perfectly balanced, non-overlapping flex layout */}
+          <div className="font-sans font-medium text-xs sm:text-sm text-slate-500 dark:text-slate-300 mt-1 flex flex-wrap items-center justify-center gap-x-2.5 gap-y-1">
+            {/* Overs */}
+            <div className="flex items-center gap-1">
+              <span className="font-score font-semibold tabular-nums text-sm sm:text-base text-slate-700 dark:text-slate-200">{oversFormatted}</span>
+              <span className="text-slate-400 dark:text-slate-500 font-light">/</span>
+              <span className="font-score font-semibold tabular-nums text-sm sm:text-base text-slate-700 dark:text-slate-200">{totalOvers}</span>
+              <span className="text-[11px] font-medium tracking-wider uppercase text-slate-500 dark:text-slate-400 ml-0.5">OV</span>
+            </div>
 
-          {/* CRR positioned neatly in the right down corner of the run div */}
-          <div className="absolute right-0 bottom-2.5 flex items-center gap-1.5 text-xs font-sans">
+            <span className="text-slate-300 dark:text-slate-600 font-light">•</span>
+
+            {/* CRR */}
             <div className="flex items-center gap-1">
               <span className="text-[10px] text-cyan-700 dark:text-cyan-400 font-semibold tracking-wider uppercase">CRR</span>
               <span className="font-score font-bold text-xs sm:text-sm text-slate-900 dark:text-white tabular-nums">{crr}</span>
             </div>
-            {target && rrr && (
+
+            {/* RRR: Only shown during live chase when overs remain and match is not completed */}
+            {status !== 'completed' && target && ballsRemaining > 0 && rrr && !String(rrr).toLowerCase().includes('finished') && (
               <>
                 <span className="text-slate-300 dark:text-slate-600 font-light">•</span>
                 <div className="flex items-center gap-1">
