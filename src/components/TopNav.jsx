@@ -3,6 +3,7 @@ import { NavLink, Link } from 'react-router-dom';
 import {
   Home,
   Trophy,
+  Coins,
   Radio,
   BarChart3,
   Plus,
@@ -14,6 +15,7 @@ import { useTheme } from '../contexts/ThemeContext';
 const navItems = [
   { label: 'Home', path: '/', icon: Home },
   { label: 'Matches', path: '/matches', icon: Trophy },
+  { label: 'Toss', path: '/toss', icon: Coins },
   { label: 'Live', path: '/live', icon: Radio },
   { label: 'Records', path: '/records', icon: BarChart3 },
 ];
@@ -25,9 +27,12 @@ export default function TopNav() {
     <header className="hidden md:block bg-ms-bg-secondary border-b border-ms-border">
       <div className="max-w-[1200px] mx-auto px-6 h-14 flex items-center justify-between">
         {/* Brand */}
-        <NavLink to="/" className="flex items-center gap-2.5 text-ms-cyan font-bold text-lg no-underline">
-          <img src="/logo.png" alt="MoonLight Strikers" className="w-8 h-8 rounded-full object-cover border border-cyan-400/40 shadow-xs" />
-          <span>MoonLight Strikers</span>
+        <NavLink to="/" className="flex items-center gap-2.5 text-ms-cyan no-underline">
+          <img src="/logo.png" alt="MoonLight Strikers" className="w-8 h-8 rounded-full object-cover border border-cyan-400/40 shadow-xs flex-shrink-0" />
+          <div className="flex flex-col leading-tight">
+            <span className="font-semibold text-base tracking-tight text-ms-cyan">MoonLight Strikers</span>
+            <span className="text-[10px] font-score tabular-nums text-slate-400 tracking-wider">v1.1.0</span>
+          </div>
         </NavLink>
 
         {/* Nav Links */}
@@ -63,12 +68,12 @@ export default function TopNav() {
             {theme === 'dark' ? (
               <>
                 <Sun className="w-4 h-4 text-amber-400" />
-                <span>Light</span>
+                <span className="text-ms-text-primary">Light</span>
               </>
             ) : (
               <>
-                <Moon className="w-4 h-4 text-ms-cyan" />
-                <span>Dark</span>
+                <Moon className="w-4 h-4 text-slate-800 dark:text-slate-200" />
+                <span className="text-ms-text-primary">Dark</span>
               </>
             )}
           </button>
@@ -77,7 +82,7 @@ export default function TopNav() {
             to="/matches/create"
             className="ms-btn ms-btn-primary text-xs py-1.5 px-3 flex items-center gap-1.5 font-bold"
           >
-            <Plus className="w-3.5 h-3.5" />
+            <Plus className="w-3.5 h-3.5 text-black dark:text-white" />
             <span>New Match</span>
           </Link>
         </div>

@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { matchService } from '../services/matchService';
 import { supabase } from '../services/supabase';
 import { Trophy, Plus, Calendar, ChevronRight, Zap, Share2, Trash2 } from 'lucide-react';
-import { shareMatchResult, isTwoDaysOld, formatMatchDate } from '../utils/shareMatch';
+import { shareMatchResult, isTwoDaysOld, formatMatchDate, formatMatchTime } from '../utils/shareMatch';
 
 export default function Matches() {
   const [filter, setFilter] = useState('all'); // 'all' | 'live' | 'completed' | 'scheduled'
@@ -144,30 +144,43 @@ export default function Matches() {
                 }`}
               >
                 {/* Header Row */}
-                <div className="flex items-center justify-between mb-2.5 min-w-0">
-                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                <div className="relative flex items-center justify-between mb-2 min-w-0">
+                  <div className="flex items-center gap-2 min-w-0 flex-1 truncate">
                     {isLive ? (
-                      <span className="ms-live-badge text-[9px] py-0.5 px-1.5 flex-shrink-0 font-bold">
+                      <span className="ms-live-badge text-[10px] py-0.5 px-2 flex-shrink-0 font-bold">
                         <span className="ms-live-dot" />
                         Live
                       </span>
                     ) : (
-                      <span className="text-[11px] font-semibold text-ms-text-muted flex items-center gap-1 flex-shrink-0">
-                        <Calendar className="w-3 h-3" />
-                        {formatMatchDate(m.created_at)}
+                      <span className="text-xs font-semibold text-slate-600 dark:text-slate-300 flex items-center gap-1.5 flex-shrink-0">
+                        <Calendar className="w-3.5 h-3.5" />
+                        <span>{formatMatchDate(m.created_at)}</span>
+                        {m.created_at && (
+                          <span className="text-[11px] text-slate-400 dark:text-slate-400 font-normal">
+                            {formatMatchTime(m.created_at)}
+                          </span>
+                        )}
                       </span>
                     )}
-                    <span className="text-[11px] text-ms-text-muted truncate">
-                      • {m.venue || 'MoonLight Oval'} ({m.overs || 16} ov)
+                    <span className="text-xs text-slate-500 dark:text-slate-400 truncate">
+                      • {m.venue || 'MoonLight Oval'} ({m.match_type === 'test' ? `${m.overs || 20} ov/inn` : `${m.overs || 16} ov`})
                     </span>
                   </div>
 
+                  {(m.match_type === 'test' || m.configured_innings > 2) && (
+                    <div className="absolute left-1/2 -translate-x-1/2 flex items-center justify-center pointer-events-none">
+                      <span className="text-[10px] sm:text-xs font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-black/5 dark:bg-white/10 text-black dark:text-white border border-black/20 dark:border-white/30 shadow-xs">
+                        TEST
+                      </span>
+                    </div>
+                  )}
+
                   <div className="flex items-center gap-1.5 flex-shrink-0">
                     {!isLive && (
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+                      <span className={`text-xs font-bold px-2.5 py-0.5 rounded ${
                         isCompleted
-                          ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30'
-                          : 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30'
+                          ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30'
+                          : 'bg-amber-500/15 text-amber-800 dark:text-amber-400 border border-amber-500/30'
                       }`}>
                         {m.status?.toUpperCase() || 'MATCH'}
                       </span>
@@ -176,26 +189,26 @@ export default function Matches() {
                 </div>
 
                 {/* Teams & Scores */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3 min-w-0">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-2.5 min-w-0">
                   <div className="flex items-center justify-between p-2 rounded-xl bg-ms-bg-input/60 border border-ms-border min-w-0">
-                    <span className="font-semibold text-xs sm:text-sm text-ms-text-primary truncate flex-1 min-w-0 pr-1">
+                    <span className="font-bold text-sm sm:text-base text-slate-900 dark:text-white truncate flex-1 min-w-0 pr-1 tracking-tight">
                       {m.team_a_name}
                     </span>
-                    <span className="font-mono text-xs sm:text-sm font-bold text-ms-cyan flex-shrink-0">
+                    <span className="font-score text-base sm:text-lg font-bold text-cyan-600 dark:text-cyan-400 flex-shrink-0 tabular-nums">
                       {m.team_a_score ?? 0}/{m.team_a_wickets ?? 0}
-                      <span className="text-[10px] sm:text-xs text-ms-text-muted ml-1 font-normal">
+                      <span className="text-xs sm:text-sm text-slate-500 dark:text-slate-300 ml-1 font-semibold tabular-nums font-score">
                         ({m.team_a_overs || '0.0'})
                       </span>
                     </span>
                   </div>
 
                   <div className="flex items-center justify-between p-2 rounded-xl bg-ms-bg-input/60 border border-ms-border min-w-0">
-                    <span className="font-semibold text-xs sm:text-sm text-ms-text-primary truncate flex-1 min-w-0 pr-1">
+                    <span className="font-bold text-sm sm:text-base text-slate-900 dark:text-white truncate flex-1 min-w-0 pr-1 tracking-tight">
                       {m.team_b_name}
                     </span>
-                    <span className="font-mono text-xs sm:text-sm font-bold text-ms-text-secondary flex-shrink-0">
+                    <span className="font-score text-base sm:text-lg font-bold text-slate-900 dark:text-white flex-shrink-0 tabular-nums">
                       {m.team_b_score ?? 0}/{m.team_b_wickets ?? 0}
-                      <span className="text-[10px] sm:text-xs text-ms-text-muted ml-1 font-normal">
+                      <span className="text-xs sm:text-sm text-slate-500 dark:text-slate-300 ml-1 font-semibold tabular-nums font-score">
                         ({m.team_b_overs || '0.0'})
                       </span>
                     </span>
@@ -204,10 +217,10 @@ export default function Matches() {
 
                 {/* Completed Match: Display WHO WON THAT MATCH prominently */}
                 {isCompleted && (
-                  <div className="mb-3 p-2 rounded-lg bg-amber-500/10 border border-amber-500/25 flex items-center justify-between">
+                  <div className="mb-2.5 p-2 rounded-lg bg-amber-500/10 border border-amber-500/25 flex items-center justify-between">
                     <div className="flex items-center gap-1.5">
-                      <Trophy className="w-4 h-4 text-amber-500 flex-shrink-0" />
-                      <span className="text-xs font-bold text-amber-700 dark:text-amber-300">
+                      <Trophy className="w-4 h-4 text-amber-500 dark:text-amber-400 flex-shrink-0" />
+                      <span className="text-xs sm:text-sm font-bold text-amber-700 dark:text-amber-300">
                         {winnerText || 'Match Completed'}
                       </span>
                     </div>
@@ -217,8 +230,8 @@ export default function Matches() {
                 {/* Live Match Target Equation */}
                 {isLive && m.target && (
                   <p className="text-xs font-semibold text-amber-600 dark:text-amber-400 mb-3 flex items-center gap-1.5">
-                    <Zap className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />
-                    <span>Target: {m.target} Runs</span>
+                    <Zap className="w-3.5 h-3.5 text-black dark:text-white flex-shrink-0" />
+                    <span>Target: <strong className="font-score font-bold text-sm tabular-nums">{m.target}</strong> Runs</span>
                   </p>
                 )}
 

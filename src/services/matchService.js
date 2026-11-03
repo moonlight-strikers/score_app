@@ -35,7 +35,9 @@ const MATCH_COLUMNS = new Set([
   'striker',
   'non_striker',
   'bowler',
-  'innings_data'
+  'innings_data',
+  'configured_innings',
+  'overs_per_innings'
 ]);
 
 function sanitizeMatch(matchData) {
@@ -157,15 +159,33 @@ export const matchService = {
     saveLocalMatches(updated);
 
     if (isSupabaseConfigured) {
-      const { data, error } = await supabase
-        .from('matches')
-        .upsert([sanitized])
-        .select()
-        .single();
+      let currentPayload = { ...sanitized };
+      let data = null;
+      let error = null;
+
+      for (let attempt = 0; attempt < 5; attempt++) {
+        const res = await supabase
+          .from('matches')
+          .upsert([currentPayload])
+          .select()
+          .single();
+        data = res.data;
+        error = res.error;
+
+        if (error && error.message && error.message.includes('in the schema cache')) {
+          const match = error.message.match(/'([^']+)' column/);
+          if (match && match[1] && currentPayload[match[1]] !== undefined) {
+            console.warn(`Column '${match[1]}' not in Supabase schema cache; retrying without it.`);
+            delete currentPayload[match[1]];
+            continue;
+          }
+        }
+        break;
+      }
 
       if (error) {
-        console.error('Supabase createMatch error:', error);
-        throw new Error(error.message || 'Failed to create match on server');
+        console.warn('Supabase createMatch note (proceeding with local storage match):', error.message);
+        return newMatch;
       }
       return data || newMatch;
     }
@@ -192,17 +212,34 @@ export const matchService = {
     });
     saveLocalMatches(updated);
 
-    // 2. Update Supabase via upsert so missing rows are inserted automatically
+    // 2. Update Supabase via upsert with resilience against unmigrated columns
     if (isSupabaseConfigured) {
-      const { data, error } = await supabase
-        .from('matches')
-        .upsert([cleanUpdates])
-        .select()
-        .single();
+      let currentPayload = { ...cleanUpdates };
+      let data = null;
+      let error = null;
+
+      for (let attempt = 0; attempt < 5; attempt++) {
+        const res = await supabase
+          .from('matches')
+          .upsert([currentPayload])
+          .select()
+          .single();
+        data = res.data;
+        error = res.error;
+
+        if (error && error.message && error.message.includes('in the schema cache')) {
+          const match = error.message.match(/'([^']+)' column/);
+          if (match && match[1] && currentPayload[match[1]] !== undefined) {
+            console.warn(`Column '${match[1]}' not in Supabase schema cache; retrying without it.`);
+            delete currentPayload[match[1]];
+            continue;
+          }
+        }
+        break;
+      }
 
       if (error) {
-        console.error('Supabase updateMatch error:', error);
-        throw new Error(error.message || 'Failed to update match on server');
+        console.warn('Supabase updateMatch note:', error.message);
       }
       return data || updatedMatch || updates;
     }
@@ -218,7 +255,14 @@ export const matchService = {
       // 1. Cascade delete all balls
       await supabase.from('ball_by_ball').delete().eq('match_id', matchId);
 
-      // 2. Delete match
+      // 2. Cascade delete all innings
+      try {
+        await supabase.from('innings').delete().eq('match_id', matchId);
+      } catch (innErr) {
+        console.warn('Note deleting innings in deleteMatch:', innErr);
+      }
+
+      // 3. Delete match
       const { error } = await supabase
         .from('matches')
         .delete()

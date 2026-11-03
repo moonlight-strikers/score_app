@@ -272,7 +272,7 @@ export default function Records() {
                   </div>
 
                   <div className="ms-card p-4 overflow-x-auto border-ms-border-light">
-                    <h3 className="text-sm font-bold text-ms-text-primary mb-3">Top Run Scorers</h3>
+                    <h3 className="text-sm font-semibold text-ms-text-primary mb-3">Top Run Scorers</h3>
                     <table className="ms-table">
                       <thead>
                         <tr>
@@ -298,12 +298,12 @@ export default function Records() {
                                 <span className="font-semibold text-ms-text-primary">{p.name}</span>
                               </div>
                             </td>
-                            <td className="text-right font-mono text-ms-text-muted">{p.matches}</td>
-                            <td className="text-right font-mono font-bold text-ms-cyan">{p.runs}</td>
-                            <td className="text-right font-mono text-ms-boundary">{p.highest}</td>
-                            <td className="text-right font-mono text-ms-text-primary">{p.sr}</td>
-                            <td className="text-right font-mono text-ms-six">{p.sixes}</td>
-                            <td className="text-right font-mono text-ms-text-muted">{p.fours}</td>
+                            <td className="text-right font-score text-ms-text-muted tabular-nums">{p.matches}</td>
+                            <td className="text-right font-score font-bold text-ms-cyan text-sm sm:text-base tabular-nums">{p.runs}</td>
+                            <td className="text-right font-score font-semibold text-ms-boundary text-sm tabular-nums">{p.highest}</td>
+                            <td className="text-right font-score font-semibold text-ms-text-primary text-sm tabular-nums">{p.sr}</td>
+                            <td className="text-right font-score font-semibold text-ms-six text-sm tabular-nums">{p.sixes}</td>
+                            <td className="text-right font-score text-ms-text-muted tabular-nums">{p.fours}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -350,7 +350,7 @@ export default function Records() {
                   </div>
 
                   <div className="ms-card p-4 overflow-x-auto border-ms-border-light">
-                    <h3 className="text-sm font-bold text-ms-text-primary mb-3">Top Wicket Takers</h3>
+                    <h3 className="text-sm font-semibold text-ms-text-primary mb-3">Top Wicket Takers</h3>
                     <table className="ms-table">
                       <thead>
                         <tr>
@@ -375,11 +375,11 @@ export default function Records() {
                                 <span className="font-semibold text-ms-text-primary">{p.name}</span>
                               </div>
                             </td>
-                            <td className="text-right font-mono text-ms-text-muted">{p.matches}</td>
-                            <td className="text-right font-mono text-ms-text-secondary">{p.overs}</td>
-                            <td className="text-right font-mono font-bold text-ms-wicket">{p.wickets}</td>
-                            <td className="text-right font-mono text-ms-cyan">{p.econ}</td>
-                            <td className="text-right font-mono text-ms-live font-semibold">{p.best}</td>
+                            <td className="text-right font-score text-ms-text-muted tabular-nums">{p.matches}</td>
+                            <td className="text-right font-score font-semibold text-ms-text-secondary tabular-nums">{p.overs}</td>
+                            <td className="text-right font-score font-bold text-ms-wicket text-sm sm:text-base tabular-nums">{p.wickets}</td>
+                            <td className="text-right font-score tabular-nums text-ms-cyan">{p.econ}</td>
+                            <td className="text-right font-score text-ms-live font-semibold tabular-nums">{p.best}</td>
                           </tr>
                         ))}
                       </tbody>

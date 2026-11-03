@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@custom-variant dark (&:where([data-theme="dark"], .dark, [data-theme="dark"] *, .dark *));
 
 /* ======================================================
    MOONLIGHT STRIKERS — Design Token System
@@ -49,8 +50,8 @@
 
   --ms-text-primary: #0f172a;
   --ms-text-secondary: #334155;
-  --ms-text-muted: #64748b;
-  --ms-text-inverse: #ffffff;
+  --ms-text-muted: #475569;
+  --ms-text-inverse: #0a0f1e;
 
   --ms-cyan: #0284c7;
   --ms-cyan-light: #38bdf8;
@@ -118,9 +119,10 @@
   --color-ms-warning: var(--ms-warning);
   --color-ms-danger: var(--ms-danger);
 
-  /* ── Typography ── */
-  --font-display: 'Inter', system-ui, -apple-system, sans-serif;
-  --font-score: 'Inter', 'Tabular Nums', system-ui, monospace;
+  /* ── Typography: Inter & Barlow Condensed ── */
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-display: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-score: 'Barlow Condensed', 'Inter', -apple-system, system-ui, sans-serif;
 
 
   /* ── Border radius ── */
@@ -128,6 +130,23 @@
   --radius-md: 0.5rem;
   --radius-lg: 0.75rem;
   --radius-xl: 1rem;
+}
+
+/* Typography Utility Classes */
+.font-sans,
+.font-display {
+  font-family: var(--font-display);
+}
+
+.font-score {
+  font-family: var(--font-score);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
 }
 
 /* ======================================================
@@ -149,6 +168,7 @@ body {
   margin: 0;
   padding: 0;
   font-family: var(--font-display);
+  font-weight: 400; /* Inter Regular for normal content */
   background-color: var(--color-ms-bg-primary);
   color: var(--color-ms-text-primary);
   min-height: 100vh;
@@ -156,6 +176,37 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow-x: hidden;
+}
+
+/* Headings: Inter Medium or SemiBold */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-display);
+  font-weight: 600; /* Inter SemiBold */
+  letter-spacing: -0.015em;
+}
+
+input,
+button,
+select,
+textarea,
+optgroup {
+  font-family: inherit;
+}
+
+/* ======================================================
+   Animate UI / Lucide Static Outline Icon Styling
+   - Consistent stroke-width: 2px (or 1.85px optical)
+   - Stroke linecap & linejoin: round
+   - Crisp rendering across Android and Desktop
+   - Black & White monochrome aesthetic
+   ====================================================== */
+svg.lucide,
+.ms-icon {
+  stroke-width: 2px;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  shape-rendering: geometricPrecision;
+  flex-shrink: 0;
 }
 
 #root {
@@ -210,30 +261,34 @@ body {
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
 }
 
-/* Score typography */
+/* Score typography: Barlow Condensed Bold/SemiBold */
 .ms-score-large {
   font-family: var(--font-score);
   font-size: 3.5rem;
-  font-weight: 800;
-  letter-spacing: -0.02em;
+  font-weight: 700;
+  letter-spacing: 0.01em;
   line-height: 1;
   font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
 }
 
 .ms-score-medium {
   font-family: var(--font-score);
-  font-size: 2rem;
+  font-size: 2.25rem;
   font-weight: 700;
-  letter-spacing: -0.01em;
+  letter-spacing: 0.01em;
   line-height: 1.1;
   font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
 }
 
 .ms-score-small {
   font-family: var(--font-score);
   font-size: 1.25rem;
   font-weight: 600;
+  letter-spacing: 0.01em;
   font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
 }
 
 /* LIVE indicator pulse */
@@ -290,6 +345,15 @@ body {
   border: 1px solid var(--color-ms-border-light);
 }
 
+[data-theme="light"] .ms-ball-run,
+.light .ms-ball-run,
+[data-theme="light"] .ms-ball-dot,
+.light .ms-ball-dot {
+  background-color: #000000;
+  color: #ffffff;
+  border-color: #000000;
+}
+
 .ms-ball-four {
   background-color: rgba(245, 158, 11, 0.15);
   color: var(--color-ms-boundary);
@@ -315,7 +379,7 @@ body {
   border: 1px solid var(--color-ms-extra);
 }
 
-/* Interactive button base */
+/* Interactive button base - Emil Kowalski design engineering principles */
 .ms-btn {
   display: inline-flex;
   align-items: center;
@@ -327,9 +391,13 @@ body {
   border-radius: var(--radius-md);
   border: none;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: transform 140ms cubic-bezier(0.23, 1, 0.32, 1), background-color 140ms ease-out, border-color 140ms ease-out, box-shadow 140ms ease-out;
   text-decoration: none;
   line-height: 1.25;
+}
+
+.ms-btn:active:not(:disabled) {
+  transform: scale(0.97);
 }
 
 .ms-btn:disabled {
@@ -340,6 +408,12 @@ body {
 .ms-btn-primary {
   background-color: var(--color-ms-cyan);
   color: var(--color-ms-text-inverse);
+  font-weight: 700;
+}
+
+[data-theme="light"] .ms-btn-primary,
+.light .ms-btn-primary {
+  color: #000000;
 }
 
 .ms-btn-primary:hover:not(:disabled) {
@@ -445,7 +519,7 @@ body {
   border-radius: var(--radius-md);
   border: 1px solid var(--color-ms-border-light);
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: transform 140ms cubic-bezier(0.23, 1, 0.32, 1), background-color 140ms ease-out, border-color 140ms ease-out, color 140ms ease-out;
   text-align: center;
   display: flex;
   align-items: center;
@@ -455,6 +529,10 @@ body {
   background-color: var(--color-ms-bg-card);
   outline: none;
   box-sizing: border-box;
+}
+
+.ms-segmented-item:active {
+  transform: scale(0.97);
 }
 
 .ms-segmented-item:hover {
@@ -489,7 +567,8 @@ body {
 .ms-table th {
   padding: 0.625rem 0.75rem;
   text-align: left;
-  font-weight: 600;
+  font-family: var(--font-display);
+  font-weight: 600; /* Inter SemiBold */
   color: var(--color-ms-text-muted);
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -502,6 +581,18 @@ body {
   padding: 0.625rem 0.75rem;
   border-bottom: 1px solid var(--color-ms-border);
   color: var(--color-ms-text-primary);
+  font-family: var(--font-display);
+  font-weight: 400; /* Inter Regular */
+}
+
+/* Numeric table columns & stats: Barlow Condensed SemiBold with tabular digits */
+.ms-table th.text-right,
+.ms-table td.text-right {
+  text-align: right;
+  font-family: var(--font-score);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
 }
 
 .ms-table tbody tr:hover {
@@ -685,3 +776,209 @@ body {
   color: var(--color-ms-danger);
   border: 1px solid rgba(239, 68, 68, 0.3);
 }
+
+/* ======================================================
+   MOONLIGHT STRIKERS — Animated Splash Screen
+   ====================================================== */
+
+@keyframes ms-splash-zoom {
+  0% {
+    opacity: 0;
+    transform: scale(0.68);
+  }
+  65% {
+    opacity: 1;
+    transform: scale(1.05);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes ms-splash-name-popup {
+  0% {
+    opacity: 0;
+    transform: translateY(16px) scale(0.92);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes ms-cyan-pulse {
+  0%, 100% {
+    box-shadow: 0 0 25px rgba(6, 182, 212, 0.35), 0 0 50px rgba(6, 182, 212, 0.15);
+  }
+  50% {
+    box-shadow: 0 0 42px rgba(6, 182, 212, 0.65), 0 0 85px rgba(6, 182, 212, 0.3);
+  }
+}
+
+.ms-splash-logo {
+  animation: ms-splash-zoom 0.95s cubic-bezier(0.16, 1, 0.3, 1) forwards,
+             ms-cyan-pulse 2.2s ease-in-out infinite 0.95s;
+}
+
+.ms-splash-title {
+  animation: ms-splash-name-popup 0.75s cubic-bezier(0.16, 1, 0.3, 1) 0.5s both;
+}
+
+.ms-splash-tag {
+  animation: ms-splash-name-popup 0.65s cubic-bezier(0.16, 1, 0.3, 1) 0.75s both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ms-splash-logo,
+  .ms-splash-title,
+  .ms-splash-tag {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}
+
+/* ======================================================
+   DIGITAL COIN TOSS 3D STYLES (Ultra-Realistic Minted Medallion)
+   ====================================================== */
+.ms-coin-stage {
+  perspective: 1400px;
+  overflow: visible;
+}
+
+.ms-coin-flight-box {
+  width: 230px;
+  height: 230px;
+  position: relative;
+  transform-style: preserve-3d;
+  will-change: transform;
+  transition: transform 0.3s ease;
+  overflow: visible;
+}
+
+@media (max-width: 480px) {
+  .ms-coin-flight-box {
+    width: 204px;
+    height: 204px;
+  }
+}
+
+/* Subtle 3D tactile tilt when hovering idle coin */
+.ms-coin-flight-box:not(.ms-coin-flight-active):hover {
+  transform: translateY(-4px) scale(1.03) rotateX(8deg) rotateY(-8deg);
+}
+
+.ms-coin-flight-active {
+  animation: ms-coin-flight 2.4s cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
+}
+
+.ms-coin {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  transform-style: preserve-3d;
+  transition: transform 2.4s cubic-bezier(0.16, 0.84, 0.22, 1);
+  will-change: transform;
+}
+
+.ms-coin-face {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+  filter: drop-shadow(0 12px 24px rgba(0, 0, 0, 0.65));
+}
+
+.ms-coin-front {
+  transform: translateZ(6px) rotateY(0deg);
+}
+
+.ms-coin-back {
+  transform: translateZ(-6px) rotateY(180deg);
+}
+
+/* 3D Physical Extruded Coin Rim Thickness (Simulates solid 12mm minted coin edge) */
+.ms-coin-rim-layer {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 4px solid #b45309;
+  background: radial-gradient(circle, #78350f 45%, #ca8a04 85%, #fef08a 100%);
+  pointer-events: none;
+}
+
+/* Ambient metallic sheen sweep */
+.ms-coin-sheen {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  pointer-events: none;
+  background: linear-gradient(
+    115deg,
+    transparent 0%,
+    transparent 40%,
+    rgba(255, 255, 255, 0.25) 50%,
+    transparent 60%,
+    transparent 100%
+  );
+  mix-blend-mode: overlay;
+}
+
+@keyframes ms-coin-flight {
+  0% {
+    transform: translateY(0) scale(1);
+  }
+  38% {
+    transform: translateY(-55px) scale(1.10);
+  }
+  75% {
+    transform: translateY(-12px) scale(1.03);
+  }
+  92% {
+    transform: translateY(2px) scale(0.99);
+  }
+  100% {
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes ms-shadow-flight {
+  0% {
+    transform: scale(1);
+    opacity: 0.65;
+  }
+  38% {
+    transform: scale(0.6) translateY(10px);
+    opacity: 0.25;
+    filter: blur(10px);
+  }
+  75% {
+    transform: scale(0.92) translateY(2px);
+    opacity: 0.55;
+    filter: blur(5px);
+  }
+  92% {
+    transform: scale(1.04);
+    opacity: 0.7;
+    filter: blur(3px);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 0.65;
+    filter: blur(4px);
+  }
+}
+
+.ms-shadow-flipping {
+  animation: ms-shadow-flight 2.4s cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
+}
+
+

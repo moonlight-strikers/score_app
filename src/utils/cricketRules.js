@@ -26,8 +26,21 @@ export const MATCH_STATUS = {
   ABANDONED: 'abandoned'
 };
 
+export function isWideDelivery(ballType) {
+  if (!ballType) return false;
+  const str = String(ballType).toUpperCase().trim();
+  return str === BALL_TYPES.WIDE || str === 'WIDE' || str === 'WD';
+}
+
+export function isNoBallDelivery(ballType) {
+  if (!ballType) return false;
+  const str = String(ballType).toUpperCase().trim();
+  return str === BALL_TYPES.NO_BALL || str === 'NO_BALL' || str === 'NOBALL' || str === 'NB';
+}
+
 export function isLegalDelivery(ballType) {
-  return ballType !== BALL_TYPES.WIDE && ballType !== BALL_TYPES.NO_BALL;
+  if (!ballType) return true;
+  return !isWideDelivery(ballType) && !isNoBallDelivery(ballType);
 }
 
 export function formatOvers(legalBalls) {
@@ -79,4 +92,77 @@ export function getBallBadgeClass(ball) {
   if (text.includes('Wd') || text.includes('Nb') || text.includes('B') || text.includes('Lb')) return 'ms-ball-extra';
   if (text === '0' || text === '•') return 'ms-ball-dot';
   return 'ms-ball-run';
+}
+
+/**
+ * Resolves accurate batter status following international cricket rules.
+ * - Currently batting: Only active batters at the crease are marked 'not out' with '*'.
+ * - Dismissed batters: Show their dismissal (Caught, Bowled, Run Out, LBW, etc.).
+ * - Did Not Bat: Players who never entered the crease display 'Did Not Bat'.
+ */
+export function resolveBatterStatus({
+  batter,
+  isActiveInnings = false,
+  activeBatterNames = [],
+  inningsCompleted = false,
+  allOut = false,
+  allowedNotOutNames = []
+}) {
+  if (!batter) return { isNotOut: false, label: 'Did Not Bat', isDnb: true };
+
+  // 1. Explicitly marked Did Not Bat
+  if (batter.didNotBat || batter.status === 'did_not_bat') {
+    return { isNotOut: false, label: 'Did Not Bat', isDnb: true };
+  }
+
+  // 2. Explicitly dismissed
+  if (batter.notOut === false || (batter.dismissal && batter.dismissal.toLowerCase() !== 'not out')) {
+    return { isNotOut: false, label: batter.dismissal || 'Out', isDnb: false };
+  }
+
+  const name = String(batter.name || '').trim().toLowerCase();
+  const normalizedActive = (activeBatterNames || []).map((n) => String(n || '').trim().toLowerCase());
+
+  // 3. Active / live innings: strictly the two batters at the crease are "not out"
+  if (isActiveInnings) {
+    if (normalizedActive.includes(name)) {
+      return { isNotOut: true, label: 'not out', isDnb: false };
+    }
+    // Has not entered crease and faced 0 balls / scored 0 runs
+    if ((Number(batter.balls) || 0) === 0 && (Number(batter.runs) || 0) === 0 && !batter.dismissal) {
+      return { isNotOut: false, label: 'Did Not Bat', isDnb: true };
+    }
+    // Batted earlier but replaced or dismissed without explicit status in legacy data
+    return { isNotOut: false, label: batter.dismissal || 'Out', isDnb: false };
+  }
+
+  // 4. Completed innings or historical scorecard
+  if (allowedNotOutNames && allowedNotOutNames.length > 0) {
+    const normalizedAllowed = allowedNotOutNames.map((n) => String(n || '').trim().toLowerCase());
+    if (normalizedAllowed.includes(name)) {
+      return { isNotOut: true, label: 'not out', isDnb: false };
+    } else {
+      if ((Number(batter.balls) || 0) === 0 && (Number(batter.runs) || 0) === 0 && !batter.dismissal) {
+        return { isNotOut: false, label: 'Did Not Bat', isDnb: true };
+      }
+      return { isNotOut: false, label: batter.dismissal || 'Out', isDnb: false };
+    }
+  }
+
+  // If all out (10 wickets) and batter didn't face balls
+  if (allOut && (Number(batter.balls) || 0) === 0 && (Number(batter.runs) || 0) === 0) {
+    return { isNotOut: false, label: 'Did Not Bat', isDnb: true };
+  }
+
+  // If marked notOut and has faced balls or scored runs
+  if (batter.notOut) {
+    return { isNotOut: true, label: 'not out', isDnb: false };
+  }
+
+  // Did not bat fallback
+  if ((Number(batter.balls) || 0) === 0 && (Number(batter.runs) || 0) === 0 && !batter.dismissal) {
+    return { isNotOut: false, label: 'Did Not Bat', isDnb: true };
+  }
+
+  return { isNotOut: false, label: batter.dismissal || 'Out', isDnb: false };
 }

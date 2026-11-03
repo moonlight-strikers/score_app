@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { matchService } from '../services/matchService';
 import { Radio, Plus, ChevronRight, Zap, Target, Shield } from 'lucide-react';
 import { getBallBadgeClass } from '../utils/cricketRules';
+import { CricketBatIcon, DotBallIcon } from '../components/CricketIcons';
 
 export default function Live() {
   const [liveMatches, setLiveMatches] = useState([]);
@@ -95,21 +96,21 @@ export default function Live() {
                     </span>
                   </div>
 
-                  <span className="text-xs font-mono text-ms-cyan font-bold flex-shrink-0">
+                  <span className="text-xs font-score text-ms-cyan font-bold tabular-nums flex-shrink-0">
                     {match.current_innings === 2 ? '2nd Inn' : '1st Inn'}
                   </span>
                 </div>
 
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3 min-w-0">
                   <div className="min-w-0">
-                    <h2 className="text-base sm:text-lg font-bold text-ms-text-primary mb-1 truncate">
+                    <h2 className="text-base sm:text-lg font-semibold text-ms-text-primary mb-1 truncate">
                       {match.team_a_name} <span className="text-xs text-ms-text-muted font-normal">vs</span> {match.team_b_name}
                     </h2>
                     <div className="flex items-baseline gap-2 min-w-0">
-                      <span className="font-mono font-black text-3xl sm:text-4xl text-ms-cyan tracking-tight">
+                      <span className="font-score font-bold text-3xl sm:text-4xl text-ms-cyan tracking-normal tabular-nums">
                         {currentScore ?? 0}/{currentWickets ?? 0}
                       </span>
-                      <span className="text-xs sm:text-sm font-semibold text-ms-text-secondary font-mono truncate">
+                      <span className="text-xs sm:text-sm font-semibold text-ms-text-secondary font-score tabular-nums truncate">
                         ({currentOvers || '0.0'} / {match.overs} ov)
                       </span>
                     </div>
@@ -117,12 +118,12 @@ export default function Live() {
 
                   {match.target && (
                     <div className="p-2.5 rounded-lg bg-ms-bg-input border border-ms-border text-left sm:text-right">
-                      <div className="text-[11px] text-ms-text-muted uppercase font-bold flex items-center gap-1 sm:justify-end">
+                      <div className="text-[11px] text-ms-text-muted uppercase font-semibold flex items-center gap-1 sm:justify-end">
                         <Target className="w-3.5 h-3.5 text-ms-cyan" />
-                        Target: {match.target}
+                        <span>Target: <strong className="font-score font-bold tabular-nums text-sm text-ms-text-primary">{match.target}</strong></span>
                       </div>
                       <div className="text-xs font-semibold text-ms-warning mt-0.5">
-                        Need {Math.max(0, match.target - (currentScore || 0))} runs
+                        Need <strong className="font-score font-bold tabular-nums">{Math.max(0, match.target - (currentScore || 0))}</strong> runs
                       </div>
                     </div>
                   )}
@@ -131,15 +132,16 @@ export default function Live() {
                 {/* Batters and bowler summary */}
                 {(match.striker || match.bowler) && (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs py-2 px-3 rounded bg-ms-bg-input/60 border border-ms-border mb-4">
-                    <div className="truncate">
+                    <div className="truncate flex items-center gap-1">
                       <span className="text-ms-text-muted">Bat: </span>
-                      <span className="text-ms-text-primary font-medium">*{match.striker?.name}</span>
-                      <span className="text-ms-cyan font-bold ml-1">({match.striker?.runs || 0})</span>
+                      <CricketBatIcon className="w-3.5 h-3.5 flex-shrink-0" />
+                      <span className="text-ms-text-primary font-medium uppercase">{match.striker?.name}</span>
+                      <span className="text-ms-cyan font-bold ml-1 font-score tabular-nums">({match.striker?.runs || 0})</span>
                     </div>
                     <div className="truncate sm:text-right">
                       <span className="text-ms-text-muted">Bowl: </span>
-                      <span className="text-ms-text-primary font-medium">{match.bowler?.name}</span>
-                      <span className="text-ms-wicket font-bold ml-1">{match.bowler?.wickets || 0}/{match.bowler?.runs || 0}</span>
+                      <span className="text-ms-text-primary font-medium uppercase">{match.bowler?.name}</span>
+                      <span className="text-ms-wicket font-bold ml-1 font-score tabular-nums">{match.bowler?.wickets || 0}/{match.bowler?.runs || 0}</span>
                     </div>
                   </div>
                 )}
@@ -149,8 +151,8 @@ export default function Live() {
                   <div className="flex items-center gap-2 mb-4 overflow-x-auto py-1">
                     <span className="text-[11px] font-bold text-ms-text-muted uppercase flex-shrink-0">Over:</span>
                     {match.recent_balls.slice(-6).map((b, i) => (
-                      <span key={i} className={`ms-ball ${getBallBadgeClass(b)}`}>
-                        {b}
+                      <span key={i} className={`ms-ball ${getBallBadgeClass(b)} flex items-center justify-center`}>
+                        {b === '0' || b === '•' ? <DotBallIcon className="w-4 h-4 text-inherit" /> : b}
                       </span>
                     ))}
                   </div>

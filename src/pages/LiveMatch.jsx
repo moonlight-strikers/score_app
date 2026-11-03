@@ -5,8 +5,9 @@ import ScoringPad from '../components/ScoringPad';
 import Scorecard from '../components/Scorecard';
 import { matchService } from '../services/matchService';
 import { scoringService } from '../services/scoringService';
+import { inningsService } from '../services/inningsService';
 import { supabase, isSupabaseConfigured } from '../services/supabase';
-import { BALL_TYPES, isLegalDelivery, formatOvers } from '../utils/cricketRules';
+import { BALL_TYPES, isLegalDelivery, isWideDelivery, isNoBallDelivery, formatOvers } from '../utils/cricketRules';
 import {
   Share2,
   ArrowLeft,
@@ -23,7 +24,8 @@ import {
   Ban,
   Trash2,
   X,
-  AlertTriangle
+  AlertTriangle,
+  Undo2
 } from 'lucide-react';
 import { shareMatchResult } from '../utils/shareMatch';
 
@@ -36,7 +38,14 @@ export default function LiveMatch() {
   const [copied, setCopied] = useState(false);
   const [matchData, setMatchData] = useState(null);
   const [errorMessage, setErrorMessage] = useState(null);
+  const [successMessage, setSuccessMessage] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isUndoing, setIsUndoing] = useState(false);
+  const [undoConfirmModal, setUndoConfirmModal] = useState({
+    isOpen: false,
+    title: '',
+    message: ''
+  });
 
   // Match management actions (Hold, Cancel, Delete)
   const [showActionsModal, setShowActionsModal] = useState(false);
@@ -50,8 +59,9 @@ export default function LiveMatch() {
   const [showBowlerModal, setShowBowlerModal] = useState(false);
   const [newBowlerName, setNewBowlerName] = useState('');
 
-  // End innings dialog & 2nd innings opening players
+  // End innings dialog & next innings opening players
   const [showEndInningsModal, setShowEndInningsModal] = useState(false);
+  const [nextInningsBattingChoice, setNextInningsBattingChoice] = useState(null); // 'normal' | 'follow_on'
   const [secondInningsForm, setSecondInningsForm] = useState({
     striker: '',
     nonStriker: '',
@@ -123,30 +133,105 @@ export default function LiveMatch() {
   const loadMatchAndBalls = async (silent = false) => {
     if (!silent) setLoading(true);
     try {
-      const match = await matchService.getMatchById(matchId);
+      const [match, dbInnings] = await Promise.all([
+        matchService.getMatchById(matchId),
+        inningsService.getInningsByMatch(matchId).catch(() => [])
+      ]);
       if (match) {
         // Fetch persisted balls for the current innings to verify score consistency
         const currentInn = match.current_innings || 1;
         const balls = await scoringService.getInningsBalls(matchId, currentInn);
 
-        if (balls && balls.length > 0) {
+        if (Array.isArray(balls)) {
           const stats = scoringService.calculateInningsScore(balls);
           const isFirst = currentInn === 1;
 
           // Reconcile innings_data array
-          const existingInnings = Array.isArray(match.innings_data) ? [...match.innings_data] : [];
+          let existingInnings = Array.isArray(match.innings_data) ? [...match.innings_data] : [];
+
+          // Merge dbInnings if present to ensure all configured innings have their metadata & IDs
+          if (Array.isArray(dbInnings) && dbInnings.length > 0) {
+            dbInnings.forEach((dbInn) => {
+              const idx = existingInnings.findIndex((i) => i.innings_number === dbInn.innings_number);
+              if (idx >= 0) {
+                existingInnings[idx] = {
+                  ...dbInn,
+                  ...existingInnings[idx],
+                  id: dbInn.id || existingInnings[idx].id,
+                  innings_status: dbInn.innings_status || existingInnings[idx].innings_status,
+                  batting_team: dbInn.batting_team || existingInnings[idx].batting_team || existingInnings[idx].team_name,
+                  bowling_team: dbInn.bowling_team || existingInnings[idx].bowling_team
+                };
+              } else {
+                existingInnings.push({
+                  ...dbInn,
+                  team_name: dbInn.batting_team,
+                  runs: dbInn.total_runs || 0,
+                  wickets: dbInn.wickets || 0,
+                  overs: formatOvers(dbInn.balls_completed || 0),
+                  batters: [],
+                  bowlers: [],
+                  extras: { wides: 0, noballs: 0, byes: 0, legbyes: 0, total: dbInn.extras || 0 }
+                });
+              }
+            });
+            existingInnings.sort((a, b) => (a.innings_number || 0) - (b.innings_number || 0));
+          }
+
           const innIdx = existingInnings.findIndex((inn) => inn.innings_number === currentInn);
           const currentBatTeam = isFirst
             ? (match.current_batting_team || match.team_a_name)
             : (match.current_batting_team || match.team_b_name);
 
+          // Merge existing innings batters with calculated ball stats & active crease batters
+          const existingBatters = existingInnings[innIdx]?.batters || [];
+          const batterMap = new Map();
+
+          // 1. Seed from existing batters to preserve batting order
+          existingBatters.forEach((b) => {
+            if (b?.name) batterMap.set(b.name, { ...b });
+          });
+
+          // 2. Overlay verified ball stats
+          (stats.batters || []).forEach((b) => {
+            if (b?.name) {
+              const prev = batterMap.get(b.name) || {};
+              batterMap.set(b.name, { ...prev, ...b });
+            }
+          });
+
+          // 3. Ensure active crease batters are included and marked notOut: true (unless dismissed)
+          if (match.striker?.name) {
+            const prev = batterMap.get(match.striker.name) || {};
+            batterMap.set(match.striker.name, {
+              ...prev,
+              ...match.striker,
+              notOut: prev.dismissal ? false : true
+            });
+          }
+          if (match.non_striker?.name) {
+            const prev = batterMap.get(match.non_striker.name) || {};
+            batterMap.set(match.non_striker.name, {
+              ...prev,
+              ...match.non_striker,
+              notOut: prev.dismissal ? false : true
+            });
+          }
+
+          const reconciledBatters = Array.from(batterMap.values());
+
           const syncedInningsObj = {
+            ...(existingInnings[innIdx] || {}),
             innings_number: currentInn,
             team_name: currentBatTeam,
+            batting_team: currentBatTeam,
             runs: stats.runs,
+            total_runs: stats.runs,
             wickets: stats.wickets,
             overs: stats.overs,
-            batters: stats.batters.length > 0 ? stats.batters : (existingInnings[innIdx]?.batters || []),
+            overs_completed: Math.floor(stats.legalBalls / 6),
+            balls_completed: stats.legalBalls,
+            batters: reconciledBatters.length > 0 ? reconciledBatters : existingBatters,
             bowlers: stats.bowlers.length > 0 ? stats.bowlers : (existingInnings[innIdx]?.bowlers || []),
             extras: stats.extras
           };
@@ -158,17 +243,19 @@ export default function LiveMatch() {
           }
 
           // Reconcile summary with balls
+          const isTeamA = currentBatTeam === match.team_a_name;
           const verifiedMatch = {
             ...match,
-            team_a_score: isFirst ? stats.runs : match.team_a_score,
-            team_a_wickets: isFirst ? stats.wickets : match.team_a_wickets,
-            team_a_overs: isFirst ? stats.overs : match.team_a_overs,
-            team_b_score: !isFirst ? stats.runs : match.team_b_score,
-            team_b_wickets: !isFirst ? stats.wickets : match.team_b_wickets,
-            team_b_overs: !isFirst ? stats.overs : match.team_b_overs,
-            recent_balls: stats.recentBalls.length > 0 ? stats.recentBalls : (match.recent_balls || []),
+            team_a_score: isTeamA ? stats.runs : match.team_a_score,
+            team_a_wickets: isTeamA ? stats.wickets : match.team_a_wickets,
+            team_a_overs: isTeamA ? stats.overs : match.team_a_overs,
+            team_b_score: !isTeamA ? stats.runs : match.team_b_score,
+            team_b_wickets: !isTeamA ? stats.wickets : match.team_b_wickets,
+            team_b_overs: !isTeamA ? stats.overs : match.team_b_overs,
+            recent_balls: stats.recentBalls,
             current_over_deliveries: stats.currentOverDeliveries,
-            completed_overs: stats.completedOvers.length > 0 ? stats.completedOvers : (match.completed_overs || []),
+            completed_overs: stats.completedOvers,
+            total_deliveries: balls.length,
             innings_data: existingInnings
           };
           setMatchData(verifiedMatch);
@@ -216,6 +303,15 @@ export default function LiveMatch() {
             }
           }
         )
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'innings', filter: `match_id=eq.${matchId}` },
+          () => {
+            if (isMounted) {
+              loadMatchAndBalls(true);
+            }
+          }
+        )
         .subscribe();
     }
 
@@ -250,20 +346,35 @@ export default function LiveMatch() {
     );
   }
 
-  const isFirstInnings = (matchData.current_innings || 1) === 1;
-  const currentRuns = isFirstInnings ? (matchData.team_a_score || 0) : (matchData.team_b_score || 0);
-  const currentWickets = isFirstInnings ? (matchData.team_a_wickets || 0) : (matchData.team_b_wickets || 0);
-  const currentOversStr = isFirstInnings ? (matchData.team_a_overs || '0.0') : (matchData.team_b_overs || '0.0');
-  const currentBattingTeam = matchData.current_batting_team || matchData.team_a_name;
-  const currentBowlingTeam = matchData.current_bowling_team || matchData.team_b_name;
+  const currentInnNum = matchData.current_innings || 1;
+  const isFirstInnings = currentInnNum === 1;
+  const isTestMatch = matchData.match_type === 'test';
+  const maxConfiguredInnings = isTestMatch ? (Number(matchData.configured_innings) || 4) : 2;
+  const oversPerInnings = isTestMatch ? (Number(matchData.overs_per_innings || matchData.overs) || 20) : (Number(matchData.overs) || 20);
+
+  const currentInnData = Array.isArray(matchData.innings_data)
+    ? matchData.innings_data.find((inn) => inn.innings_number === currentInnNum)
+    : null;
+
+  const currentRuns = currentInnData?.runs ?? (isFirstInnings ? (matchData.team_a_score || 0) : (matchData.team_b_score || 0));
+  const currentWickets = currentInnData?.wickets ?? (isFirstInnings ? (matchData.team_a_wickets || 0) : (matchData.team_b_wickets || 0));
+  const currentOversStr = currentInnData?.overs ?? (isFirstInnings ? (matchData.team_a_overs || '0.0') : (matchData.team_b_overs || '0.0'));
+  const currentBattingTeam = currentInnData?.batting_team || currentInnData?.team_name || matchData.current_batting_team || (isFirstInnings ? matchData.team_a_name : matchData.team_b_name);
+  const currentBowlingTeam = currentInnData?.bowling_team || matchData.current_bowling_team || (currentBattingTeam === matchData.team_a_name ? matchData.team_b_name : matchData.team_a_name);
 
   // Convert overs string to legal balls count
   const [ovFull, ovBalls] = currentOversStr.split('.').map(Number);
   const currentLegalBalls = (ovFull || 0) * 6 + (ovBalls || 0);
 
+  // Check if undo is possible in current innings
+  const currentDeliveriesCount = (matchData.total_deliveries ?? 0) > 0
+    ? matchData.total_deliveries
+    : (matchData.recent_balls?.length ?? 0);
+  const canPerformUndo = currentDeliveriesCount > 0 || historyStack.length > 0 || currentLegalBalls > 0;
+
   // Save current state for Undo
   const pushHistory = () => {
-    setHistoryStack((prev) => [JSON.parse(JSON.stringify(matchData)), ...prev.slice(0, 15)]);
+    setHistoryStack((prev) => [JSON.parse(JSON.stringify(matchData)), ...prev.slice(0, 30)]);
   };
 
   const handleScoreBall = async ({ runs, type, batsmanRuns = 0, isFour = false, isSix = false }) => {
@@ -272,13 +383,15 @@ export default function LiveMatch() {
     setErrorMessage(null);
 
     const isLegal = isLegalDelivery(type);
+    const isWide = isWideDelivery(type);
+    const isNb = isNoBallDelivery(type);
     const newLegalBalls = isLegal ? currentLegalBalls + 1 : currentLegalBalls;
     const newOversStr = formatOvers(newLegalBalls);
     const newTotalRuns = currentRuns + runs;
 
-    const ballLabel = type === BALL_TYPES.WIDE
+    const ballLabel = isWide
       ? (runs > 1 ? `${runs}Wd` : 'Wd')
-      : type === BALL_TYPES.NO_BALL
+      : isNb
       ? (runs > 1 ? `${runs}Nb` : 'Nb')
       : type === BALL_TYPES.BYE
       ? `${runs}B`
@@ -286,24 +399,37 @@ export default function LiveMatch() {
       ? `${runs}Lb`
       : `${runs}`;
 
-    const runsForBatsman = type === BALL_TYPES.NORMAL ? runs : batsmanRuns;
+    const runsForBatsman = (type === BALL_TYPES.NORMAL && !isWide && !isNb) ? runs : batsmanRuns;
+    const nextSeq = ((matchData.total_deliveries ?? matchData.recent_balls?.length ?? 0) + 1);
+    const currentInningsId = currentInnData?.id || matchData.innings_data?.find(i => i.innings_number === currentInnNum)?.id || null;
 
     // 1. Prepare delivery event record for ball_by_ball table
     const ballRecord = {
       match_id: matchData.id,
+      innings_id: currentInningsId,
       innings_number: matchData.current_innings || 1,
       over_number: Math.floor(currentLegalBalls / 6),
       ball_number: isLegal ? (currentLegalBalls % 6) + 1 : (currentLegalBalls % 6) || 1,
-      delivery_sequence: (matchData.recent_balls?.length || 0) + (currentLegalBalls || 0) + 1,
+      delivery_sequence: nextSeq,
       striker_name: matchData.striker?.name || 'Striker',
       bowler_name: matchData.bowler?.name || 'Bowler',
       runs: runs,
-      type: type.toLowerCase(),
+      type: isWide ? 'wide' : (isNb ? 'no_ball' : String(type).toLowerCase()),
       batsman_runs: runsForBatsman,
-      extras: (type === BALL_TYPES.WIDE || type === BALL_TYPES.NO_BALL || type === BALL_TYPES.BYE || type === BALL_TYPES.LEG_BYE) ? {
-        type: type.toLowerCase(),
-        runs: (type === BALL_TYPES.WIDE || type === BALL_TYPES.NO_BALL) ? (runs - runsForBatsman) : runs
-      } : null,
+      extras: {
+        ...((isWide || isNb || type === BALL_TYPES.BYE || type === BALL_TYPES.LEG_BYE) ? {
+          type: isWide ? 'wide' : (isNb ? 'no_ball' : String(type).toLowerCase()),
+          runs: (isWide || isNb) ? (runs - runsForBatsman) : runs
+        } : {}),
+        crease_state: {
+          striker: matchData.striker,
+          non_striker: matchData.non_striker,
+          bowler: matchData.bowler,
+          status: matchData.status,
+          result: matchData.result,
+          winner_team: matchData.winner_team
+        }
+      },
       wicket: null
     };
 
@@ -323,26 +449,31 @@ export default function LiveMatch() {
     let updatedStriker = {
       ...matchData.striker,
       runs: (matchData.striker?.runs || 0) + runsForBatsman,
-      balls: isLegal ? (matchData.striker?.balls || 0) + 1 : (matchData.striker?.balls || 0),
+      balls: (!isWide) ? (matchData.striker?.balls || 0) + 1 : (matchData.striker?.balls || 0),
       fours: isFour ? (matchData.striker?.fours || 0) + 1 : (matchData.striker?.fours || 0),
       sixes: isSix ? (matchData.striker?.sixes || 0) + 1 : (matchData.striker?.sixes || 0),
     };
 
     let updatedNonStriker = { ...matchData.non_striker };
 
-    // Swap strike on odd runs if normal ball or bye/leg-bye
-    const oddRuns = runs % 2 !== 0;
-    const shouldSwapStrike = (type === BALL_TYPES.NORMAL || type === BALL_TYPES.BYE || type === BALL_TYPES.LEG_BYE) && oddRuns;
+    // Swap strike on odd runs
+    let shouldSwapStrike = false;
+    if (isWide || isNb) {
+      const runningRuns = Math.max(0, runs - 1);
+      if (runningRuns % 2 !== 0) shouldSwapStrike = true;
+    } else {
+      if (runs % 2 !== 0) shouldSwapStrike = true;
+    }
+
     if (shouldSwapStrike) {
       const temp = updatedStriker;
       updatedStriker = updatedNonStriker;
       updatedNonStriker = temp;
     }
 
-    // Over finished?
-    const isOverFinished = isLegal && (newLegalBalls % 6 === 0);
+    // Over finished? Complete ONLY after 6 legal balls.
+    const isOverFinished = isLegal && (newLegalBalls > 0) && (newLegalBalls % 6 === 0);
     if (isOverFinished) {
-      // Rotate strike at end of over
       const temp = updatedStriker;
       updatedStriker = updatedNonStriker;
       updatedNonStriker = temp;
@@ -367,49 +498,72 @@ export default function LiveMatch() {
     let matchResult = matchData.result;
     let winnerTeam = matchData.winner_team;
 
-    if (!isFirstInnings && matchData.target) {
-      if (newTotalRuns >= matchData.target) {
-        newStatus = 'completed';
-        const wicketsRemaining = 10 - currentWickets;
-        winnerTeam = currentBattingTeam;
-        matchResult = `${currentBattingTeam} won by ${wicketsRemaining} ${wicketsRemaining === 1 ? 'wicket' : 'wickets'}!`;
-      } else if (newLegalBalls >= (matchData.overs * 6) || currentWickets >= 10) {
-        newStatus = 'completed';
-        const diff = (matchData.target - 1) - newTotalRuns;
-        if (diff > 0) {
-          winnerTeam = currentBowlingTeam;
-          matchResult = `${currentBowlingTeam} won by ${diff} runs!`;
-        } else {
-          winnerTeam = 'Tie';
-          matchResult = 'Match Tied!';
+    if (isTestMatch) {
+      if (currentInnNum === maxConfiguredInnings && matchData.target) {
+        if (newTotalRuns >= matchData.target) {
+          newStatus = 'completed';
+          const wicketsRemaining = 10 - currentWickets;
+          winnerTeam = currentBattingTeam;
+          matchResult = `${currentBattingTeam} won by ${wicketsRemaining} ${wicketsRemaining === 1 ? 'wicket' : 'wickets'}!`;
+        } else if (newLegalBalls >= (oversPerInnings * 6) || currentWickets >= 10) {
+          newStatus = 'completed';
+          const diff = (matchData.target - 1) - newTotalRuns;
+          if (diff > 0) {
+            winnerTeam = currentBowlingTeam;
+            matchResult = `${currentBowlingTeam} won by ${diff} runs!`;
+          } else {
+            winnerTeam = 'Draw';
+            matchResult = 'Match Drawn!';
+          }
         }
+      } else if (currentInnNum === 1 && maxConfiguredInnings === 1 && (newLegalBalls >= (oversPerInnings * 6) || currentWickets >= 10)) {
+        newStatus = 'completed';
+        winnerTeam = currentBattingTeam;
+        matchResult = `${currentBattingTeam} scored ${newTotalRuns}/${currentWickets} in ${newOversStr} ov.`;
+      } else if (currentInnNum < maxConfiguredInnings && (newLegalBalls >= (oversPerInnings * 6) || currentWickets >= 10)) {
+        setShowEndInningsModal(true);
+      }
+    } else {
+      // Limited Overs
+      if (!isFirstInnings && matchData.target) {
+        if (newTotalRuns >= matchData.target) {
+          newStatus = 'completed';
+          const wicketsRemaining = 10 - currentWickets;
+          winnerTeam = currentBattingTeam;
+          matchResult = `${currentBattingTeam} won by ${wicketsRemaining} ${wicketsRemaining === 1 ? 'wicket' : 'wickets'}!`;
+        } else if (newLegalBalls >= (oversPerInnings * 6) || currentWickets >= 10) {
+          newStatus = 'completed';
+          const diff = (matchData.target - 1) - newTotalRuns;
+          if (diff > 0) {
+            winnerTeam = currentBowlingTeam;
+            matchResult = `${currentBowlingTeam} won by ${diff} runs!`;
+          } else {
+            winnerTeam = 'Tie';
+            matchResult = 'Match Tied!';
+          }
+        }
+      } else if (isFirstInnings && (newLegalBalls >= (oversPerInnings * 6) || currentWickets >= 10)) {
+        setShowEndInningsModal(true);
       }
     }
 
-    // Check End of 1st Innings
-    if (isFirstInnings && (newLegalBalls >= (matchData.overs * 6) || currentWickets >= 10)) {
-      setShowEndInningsModal(true);
-    }
-
     // Current over deliveries
-    const prevOverEnded = currentLegalBalls > 0 && currentLegalBalls % 6 === 0;
-    const updatedOverDeliveries = prevOverEnded
-      ? [ballLabel]
-      : [...(matchData.current_over_deliveries || []), ballLabel];
-
-    // Maintain completed overs history
+    const currentDeliveries = [...(matchData.current_over_deliveries || []), ballLabel];
     let updatedCompletedOvers = [...(matchData.completed_overs || [])];
+    let nextOverDeliveries = currentDeliveries;
+
     if (isOverFinished) {
-      const overRuns = updatedOverDeliveries.reduce((acc, b) => {
+      const overRuns = currentDeliveries.reduce((acc, b) => {
         const match = b.match(/\d+/);
         return acc + (match ? parseInt(match[0], 10) : (b.includes('Wd') || b.includes('Nb') ? 1 : 0));
       }, 0);
       updatedCompletedOvers.push({
         overNumber: newLegalBalls / 6,
         bowler: updatedBowler.name || 'Bowler',
-        deliveries: [...updatedOverDeliveries],
+        deliveries: [...currentDeliveries],
         runs: overRuns,
       });
+      nextOverDeliveries = [];
     }
 
     const updatedBowlersHistory = Array.from(new Set([
@@ -418,21 +572,42 @@ export default function LiveMatch() {
     ].filter(Boolean)));
 
     // Maintain innings_data for full scorecard tab
-    const currentInnNum = matchData.current_innings || 1;
+    const curInnNum = matchData.current_innings || 1;
     const existingInningsList = [...(matchData.innings_data || [])];
-    const innIdx = existingInningsList.findIndex((inn) => inn.innings_number === currentInnNum);
+    const innIdx = existingInningsList.findIndex((inn) => inn.innings_number === curInnNum);
+    const existingBatters = existingInningsList[innIdx]?.batters ? [...existingInningsList[innIdx].batters] : [];
+    const updatedBatters = [...existingBatters];
+
+    const sIdx = updatedBatters.findIndex(b => b.name === updatedStriker.name);
+    if (sIdx >= 0) {
+      updatedBatters[sIdx] = { ...updatedBatters[sIdx], ...updatedStriker, notOut: true };
+    } else {
+      updatedBatters.push({ ...updatedStriker, notOut: true });
+    }
+
+    const nsIdx = updatedBatters.findIndex(b => b.name === updatedNonStriker.name);
+    if (nsIdx >= 0) {
+      updatedBatters[nsIdx] = { ...updatedBatters[nsIdx], ...updatedNonStriker, notOut: true };
+    } else {
+      updatedBatters.push({ ...updatedNonStriker, notOut: true });
+    }
 
     const updatedInningsObj = {
-      innings_number: currentInnNum,
+      ...(existingInningsList[innIdx] || {}),
+      id: currentInningsId || existingInningsList[innIdx]?.id,
+      match_id: matchData.id,
+      innings_number: curInnNum,
       team_name: currentBattingTeam,
+      batting_team: currentBattingTeam,
+      bowling_team: currentBowlingTeam,
       runs: newTotalRuns,
+      total_runs: newTotalRuns,
       wickets: currentWickets,
       overs: newOversStr,
-      batters: [
-        ...(existingInningsList[innIdx]?.batters || []).filter(b => b.name !== updatedStriker.name && b.name !== updatedNonStriker.name),
-        updatedStriker,
-        updatedNonStriker
-      ],
+      overs_completed: Math.floor(newLegalBalls / 6),
+      balls_completed: newLegalBalls,
+      innings_status: 'live',
+      batters: updatedBatters,
       bowlers: [
         ...(existingInningsList[innIdx]?.bowlers || []).filter(bw => bw.name !== updatedBowler.name),
         updatedBowler
@@ -452,19 +627,20 @@ export default function LiveMatch() {
       status: newStatus,
       result: matchResult,
       winner_team: winnerTeam,
-      team_a_score: isFirstInnings ? newTotalRuns : matchData.team_a_score,
-      team_a_wickets: isFirstInnings ? currentWickets : matchData.team_a_wickets,
-      team_a_overs: isFirstInnings ? newOversStr : matchData.team_a_overs,
-      team_b_score: !isFirstInnings ? newTotalRuns : matchData.team_b_score,
-      team_b_wickets: !isFirstInnings ? currentWickets : matchData.team_b_wickets,
-      team_b_overs: !isFirstInnings ? newOversStr : matchData.team_b_overs,
+      team_a_score: currentBattingTeam === matchData.team_a_name ? newTotalRuns : matchData.team_a_score,
+      team_a_wickets: currentBattingTeam === matchData.team_a_name ? currentWickets : matchData.team_a_wickets,
+      team_a_overs: currentBattingTeam === matchData.team_a_name ? newOversStr : matchData.team_a_overs,
+      team_b_score: currentBattingTeam === matchData.team_b_name ? newTotalRuns : matchData.team_b_score,
+      team_b_wickets: currentBattingTeam === matchData.team_b_name ? currentWickets : matchData.team_b_wickets,
+      team_b_overs: currentBattingTeam === matchData.team_b_name ? newOversStr : matchData.team_b_overs,
       striker: updatedStriker,
       non_striker: updatedNonStriker,
       bowler: updatedBowler,
       bowlers_history: updatedBowlersHistory,
       recent_balls: [...(matchData.recent_balls || []).slice(-17), ballLabel],
-      current_over_deliveries: updatedOverDeliveries,
+      current_over_deliveries: nextOverDeliveries,
       completed_overs: updatedCompletedOvers,
+      total_deliveries: nextSeq,
       innings_data: existingInningsList
     };
 
@@ -472,6 +648,18 @@ export default function LiveMatch() {
 
     if (isOverFinished && newStatus !== 'completed') {
       setShowBowlerModal(true);
+    }
+
+    // Synchronize to Supabase innings table and matches table in parallel
+    if (currentInningsId) {
+      inningsService.updateInnings(currentInningsId, {
+        match_id: matchData.id,
+        total_runs: newTotalRuns,
+        wickets: currentWickets,
+        overs_completed: Math.floor(newLegalBalls / 6),
+        balls_completed: newLegalBalls,
+        innings_status: 'live'
+      }).catch(err => console.warn('Innings update sync note:', err));
     }
 
     try {
@@ -503,20 +691,32 @@ export default function LiveMatch() {
     };
 
     const playerOutName = isStriker ? (matchData.striker?.name || 'Striker') : (matchData.non_striker?.name || 'Non-Striker');
+    const nextSeq = ((matchData.total_deliveries ?? matchData.recent_balls?.length ?? 0) + 1);
+    const currentInningsId = currentInnData?.id || matchData.innings_data?.find(i => i.innings_number === currentInnNum)?.id || null;
 
     // 1. Prepare wicket delivery record for ball_by_ball table
     const ballRecord = {
       match_id: matchData.id,
+      innings_id: currentInningsId,
       innings_number: matchData.current_innings || 1,
       over_number: Math.floor(currentLegalBalls / 6),
       ball_number: (currentLegalBalls % 6) + 1,
-      delivery_sequence: (matchData.recent_balls?.length || 0) + (currentLegalBalls || 0) + 1,
+      delivery_sequence: nextSeq,
       striker_name: matchData.striker?.name || 'Striker',
       bowler_name: matchData.bowler?.name || 'Bowler',
       runs: 0,
       type: 'wicket',
       batsman_runs: 0,
-      extras: null,
+      extras: {
+        crease_state: {
+          striker: matchData.striker,
+          non_striker: matchData.non_striker,
+          bowler: matchData.bowler,
+          status: matchData.status,
+          result: matchData.result,
+          winner_team: matchData.winner_team
+        }
+      },
       wicket: {
         wicketType,
         playerOut: playerOutName,
@@ -538,8 +738,8 @@ export default function LiveMatch() {
 
     pushHistory();
 
-    const finalStriker = isStriker ? newBatterObj : matchData.striker;
-    const finalNonStriker = !isStriker ? newBatterObj : matchData.non_striker;
+    let finalStriker = isStriker ? newBatterObj : matchData.striker;
+    let finalNonStriker = !isStriker ? newBatterObj : matchData.non_striker;
 
     // Update bowler wickets
     const bowlerBallsCount = (matchData.bowler?.ballsCount || 0) + 1;
@@ -551,38 +751,64 @@ export default function LiveMatch() {
       wickets: (matchData.bowler?.wickets || 0) + (wicketType !== 'Run Out' ? 1 : 0),
     };
 
-    const isOverFinished = newLegalBalls % 6 === 0;
+    const isOverFinished = newLegalBalls > 0 && newLegalBalls % 6 === 0;
+    if (isOverFinished) {
+      // Rotate strike at end of over
+      const temp = finalStriker;
+      finalStriker = finalNonStriker;
+      finalNonStriker = temp;
+    }
 
     let newStatus = matchData.status;
     let matchResult = matchData.result;
     let winnerTeam = matchData.winner_team;
 
-    if (!isFirstInnings && matchData.target && newWickets >= 10) {
-      newStatus = 'completed';
-      const diff = (matchData.target - 1) - currentRuns;
-      winnerTeam = diff > 0 ? currentBowlingTeam : 'Tie';
-      matchResult = diff > 0 ? `${currentBowlingTeam} won by ${diff} runs!` : 'Match Tied!';
-    } else if (isFirstInnings && newWickets >= 10) {
-      setShowEndInningsModal(true);
+    if (isTestMatch) {
+      if (currentInnNum === maxConfiguredInnings && matchData.target && newWickets >= 10) {
+        newStatus = 'completed';
+        const diff = (matchData.target - 1) - currentRuns;
+        if (diff > 0) {
+          winnerTeam = currentBowlingTeam;
+          matchResult = `${currentBowlingTeam} won by ${diff} runs!`;
+        } else {
+          winnerTeam = 'Tie';
+          matchResult = 'Match Tied!';
+        }
+      } else if (currentInnNum === 1 && maxConfiguredInnings === 1 && newWickets >= 10) {
+        newStatus = 'completed';
+        winnerTeam = currentBattingTeam;
+        matchResult = `${currentBattingTeam} scored ${currentRuns}/${newWickets} in ${newOversStr} ov.`;
+      } else if (currentInnNum < maxConfiguredInnings && newWickets >= 10) {
+        setShowEndInningsModal(true);
+      }
+    } else {
+      // Limited Overs
+      if (!isFirstInnings && matchData.target && newWickets >= 10) {
+        newStatus = 'completed';
+        const diff = (matchData.target - 1) - currentRuns;
+        winnerTeam = diff > 0 ? currentBowlingTeam : 'Tie';
+        matchResult = diff > 0 ? `${currentBowlingTeam} won by ${diff} runs!` : 'Match Tied!';
+      } else if (isFirstInnings && newWickets >= 10) {
+        setShowEndInningsModal(true);
+      }
     }
 
-    const prevOverEnded = currentLegalBalls > 0 && currentLegalBalls % 6 === 0;
-    const updatedOverDeliveries = prevOverEnded
-      ? ['W']
-      : [...(matchData.current_over_deliveries || []), 'W'];
-
+    const currentDeliveries = [...(matchData.current_over_deliveries || []), 'W'];
     let updatedCompletedOvers = [...(matchData.completed_overs || [])];
-    if (newLegalBalls % 6 === 0) {
-      const overRuns = updatedOverDeliveries.reduce((acc, b) => {
+    let nextOverDeliveries = currentDeliveries;
+
+    if (isOverFinished) {
+      const overRuns = currentDeliveries.reduce((acc, b) => {
         const match = b.match(/\d+/);
         return acc + (match ? parseInt(match[0], 10) : (b.includes('Wd') || b.includes('Nb') ? 1 : 0));
       }, 0);
       updatedCompletedOvers.push({
         overNumber: newLegalBalls / 6,
         bowler: updatedBowler.name || 'Bowler',
-        deliveries: [...updatedOverDeliveries],
+        deliveries: [...currentDeliveries],
         runs: overRuns,
       });
+      nextOverDeliveries = [];
     }
 
     const updatedBowlersHistory = Array.from(new Set([
@@ -591,21 +817,65 @@ export default function LiveMatch() {
     ].filter(Boolean)));
 
     // Maintain innings_data
-    const currentInnNum = matchData.current_innings || 1;
+    const curInnNum = matchData.current_innings || 1;
     const existingInningsList = [...(matchData.innings_data || [])];
-    const innIdx = existingInningsList.findIndex((inn) => inn.innings_number === currentInnNum);
+    const innIdx = existingInningsList.findIndex((inn) => inn.innings_number === curInnNum);
+    const existingBatters = existingInningsList[innIdx]?.batters ? [...existingInningsList[innIdx].batters] : [];
+    const updatedBatters = [...existingBatters];
+
+    const dismissalLabel = fielder ? `${wicketType} (${fielder})` : wicketType;
+    const dismissedRaw = isStriker ? matchData.striker : matchData.non_striker;
+    const dismissedBatter = {
+      ...(dismissedRaw || {}),
+      name: playerOutName,
+      balls: (dismissedRaw?.balls || 0) + (isStriker ? 1 : 0),
+      notOut: false,
+      dismissal: dismissalLabel
+    };
+
+    // Update dismissed batter in place
+    const outIdx = updatedBatters.findIndex(b => b.name === playerOutName);
+    if (outIdx >= 0) {
+      updatedBatters[outIdx] = { ...updatedBatters[outIdx], ...dismissedBatter };
+    } else {
+      updatedBatters.push(dismissedBatter);
+    }
+
+    // Update surviving batter in place
+    const survivingBatter = isStriker ? matchData.non_striker : matchData.striker;
+    if (survivingBatter?.name) {
+      const survIdx = updatedBatters.findIndex(b => b.name === survivingBatter.name);
+      if (survIdx >= 0) {
+        updatedBatters[survIdx] = { ...updatedBatters[survIdx], ...survivingBatter, notOut: true };
+      } else {
+        updatedBatters.push({ ...survivingBatter, notOut: true });
+      }
+    }
+
+    // Add or update incoming new batter
+    const newIdx = updatedBatters.findIndex(b => b.name === newBatterObj.name);
+    if (newIdx >= 0) {
+      updatedBatters[newIdx] = { ...updatedBatters[newIdx], ...newBatterObj, notOut: true };
+    } else {
+      updatedBatters.push({ ...newBatterObj, notOut: true });
+    }
 
     const updatedInningsObj = {
-      innings_number: currentInnNum,
+      ...(existingInningsList[innIdx] || {}),
+      id: currentInningsId || existingInningsList[innIdx]?.id,
+      match_id: matchData.id,
+      innings_number: curInnNum,
       team_name: currentBattingTeam,
+      batting_team: currentBattingTeam,
+      bowling_team: currentBowlingTeam,
       runs: currentRuns,
+      total_runs: currentRuns,
       wickets: newWickets,
       overs: newOversStr,
-      batters: [
-        ...(existingInningsList[innIdx]?.batters || []).filter(b => b.name !== finalStriker.name && b.name !== finalNonStriker.name),
-        finalStriker,
-        finalNonStriker
-      ],
+      overs_completed: Math.floor(newLegalBalls / 6),
+      balls_completed: newLegalBalls,
+      innings_status: 'live',
+      batters: updatedBatters,
       bowlers: [
         ...(existingInningsList[innIdx]?.bowlers || []).filter(bw => bw.name !== updatedBowler.name),
         updatedBowler
@@ -624,19 +894,20 @@ export default function LiveMatch() {
       status: newStatus,
       result: matchResult,
       winner_team: winnerTeam,
-      team_a_score: isFirstInnings ? currentRuns : matchData.team_a_score,
-      team_a_wickets: isFirstInnings ? newWickets : matchData.team_a_wickets,
-      team_a_overs: isFirstInnings ? newOversStr : matchData.team_a_overs,
-      team_b_score: !isFirstInnings ? currentRuns : matchData.team_b_score,
-      team_b_wickets: !isFirstInnings ? newWickets : matchData.team_b_wickets,
-      team_b_overs: !isFirstInnings ? newOversStr : matchData.team_b_overs,
+      team_a_score: currentBattingTeam === matchData.team_a_name ? currentRuns : matchData.team_a_score,
+      team_a_wickets: currentBattingTeam === matchData.team_a_name ? newWickets : matchData.team_a_wickets,
+      team_a_overs: currentBattingTeam === matchData.team_a_name ? newOversStr : matchData.team_a_overs,
+      team_b_score: currentBattingTeam === matchData.team_b_name ? currentRuns : matchData.team_b_score,
+      team_b_wickets: currentBattingTeam === matchData.team_b_name ? newWickets : matchData.team_b_wickets,
+      team_b_overs: currentBattingTeam === matchData.team_b_name ? newOversStr : matchData.team_b_overs,
       striker: finalStriker,
       non_striker: finalNonStriker,
       bowler: updatedBowler,
       bowlers_history: updatedBowlersHistory,
       recent_balls: [...(matchData.recent_balls || []).slice(-17), 'W'],
-      current_over_deliveries: updatedOverDeliveries,
+      current_over_deliveries: nextOverDeliveries,
       completed_overs: updatedCompletedOvers,
+      total_deliveries: nextSeq,
       innings_data: existingInningsList
     };
 
@@ -644,6 +915,18 @@ export default function LiveMatch() {
 
     if (isOverFinished && newStatus !== 'completed') {
       setShowBowlerModal(true);
+    }
+
+    // Synchronize to Supabase innings table
+    if (currentInningsId) {
+      inningsService.updateInnings(currentInningsId, {
+        match_id: matchData.id,
+        total_runs: currentRuns,
+        wickets: newWickets,
+        overs_completed: Math.floor(newLegalBalls / 6),
+        balls_completed: newLegalBalls,
+        innings_status: 'live'
+      }).catch(err => console.warn('Innings update sync note:', err));
     }
 
     try {
@@ -657,41 +940,213 @@ export default function LiveMatch() {
   };
 
   const handleUndo = async () => {
-    if (isSaving) return;
+    if (isSaving || isUndoing) return;
+
+    // Check if the last delivery was a wicket or completed the match
+    const isWicketLast = matchData.recent_balls?.length > 0 && matchData.recent_balls[matchData.recent_balls.length - 1] === 'W';
+    const isMatchCompleted = matchData.status === 'completed';
+
+    if (isWicketLast || isMatchCompleted) {
+      setUndoConfirmModal({
+        isOpen: true,
+        title: isMatchCompleted ? 'Undo Match-Ending Delivery?' : 'Undo Wicket Delivery?',
+        message: isMatchCompleted
+          ? 'The last delivery completed the match. Undoing this delivery will reopen the match fixture as live and recalculate all statistics. Do you wish to continue?'
+          : 'The last delivery was recorded as a wicket. Undoing this delivery will restore the dismissed batter to the crease and decrement the team wicket count. Do you wish to continue?'
+      });
+      return;
+    }
+
+    await executeUndo();
+  };
+
+  const executeUndo = async () => {
+    if (isSaving || isUndoing) return;
+    setIsUndoing(true);
     setIsSaving(true);
     setErrorMessage(null);
+    setSuccessMessage(null);
+    setUndoConfirmModal({ isOpen: false, title: '', message: '' });
 
     try {
-      await scoringService.undoBall(matchData.id);
-
-      // Re-fetch balls and strictly calculate innings score from persisted balls
       const currentInn = matchData.current_innings || 1;
-      const balls = await scoringService.getInningsBalls(matchData.id, currentInn);
-      const stats = scoringService.calculateInningsScore(balls);
       const isFirst = currentInn === 1;
 
-      const previousState = historyStack[0];
+      // 1. Delete delivery from Supabase / localStorage scoped to current innings
+      const undoResult = await scoringService.undoBall(matchData.id, currentInn);
+      if (!undoResult?.success) {
+        throw new Error(undoResult?.error || 'No deliveries available to undo in this innings');
+      }
+
+      const removedBall = undoResult.removed;
+
+      // 2. Fetch authoritative remaining deliveries
+      const remainingBalls = await scoringService.getInningsBalls(matchData.id, currentInn);
+      const stats = scoringService.calculateInningsScore(remainingBalls);
+
+      // 3. Reconstruct active crease positions (striker, non-striker, bowler)
+      const crease = scoringService.reconstructCrease(
+        remainingBalls,
+        { striker: matchData.striker, nonStriker: matchData.non_striker, bowler: matchData.bowler },
+        removedBall
+      );
+
+      // Resolve striker stats
+      const strikerStat = stats.batters.find(b => b.name === crease.strikerName);
+      const restoredStriker = {
+        name: crease.strikerName,
+        runs: strikerStat?.runs || 0,
+        balls: strikerStat?.balls || 0,
+        fours: strikerStat?.fours || 0,
+        sixes: strikerStat?.sixes || 0,
+        notOut: true
+      };
+
+      // Resolve non-striker stats
+      const nonStrikerStat = stats.batters.find(b => b.name === crease.nonStrikerName);
+      const restoredNonStriker = {
+        name: crease.nonStrikerName,
+        runs: nonStrikerStat?.runs || 0,
+        balls: nonStrikerStat?.balls || 0,
+        fours: nonStrikerStat?.fours || 0,
+        sixes: nonStrikerStat?.sixes || 0,
+        notOut: true
+      };
+
+      // Resolve bowler stats
+      const bowlerStat = stats.bowlers.find(bw => bw.name === crease.bowlerName);
+      const restoredBowler = {
+        name: crease.bowlerName,
+        overs: bowlerStat?.overs || '0.0',
+        runs: bowlerStat?.runs || 0,
+        wickets: bowlerStat?.wickets || 0,
+        economy: bowlerStat?.economy || '0.00',
+        maidens: bowlerStat?.maidens || 0,
+        ballsCount: bowlerStat?.ballsCount || 0
+      };
+
+      // 4. Revert Match Completion if criteria no longer met
+      let newStatus = matchData.status;
+      let newResult = matchData.result;
+      let newWinner = matchData.winner_team;
+
+      if (matchData.status === 'completed') {
+        if (isTestMatch) {
+          if (currentInn === maxConfiguredInnings && matchData.target) {
+            if (stats.runs < matchData.target && stats.legalBalls < (oversPerInnings * 6) && stats.wickets < 10) {
+              newStatus = 'live';
+              newResult = null;
+              newWinner = null;
+            }
+          } else if (currentInn === 1 && maxConfiguredInnings === 1) {
+            if (stats.legalBalls < (oversPerInnings * 6) && stats.wickets < 10) {
+              newStatus = 'live';
+              newResult = null;
+              newWinner = null;
+            }
+          }
+        } else {
+          if (!isFirst && matchData.target) {
+            if (stats.runs < matchData.target && stats.legalBalls < (oversPerInnings * 6) && stats.wickets < 10) {
+              newStatus = 'live';
+              newResult = null;
+              newWinner = null;
+            }
+          } else if (isFirst) {
+            if (stats.legalBalls < (oversPerInnings * 6) && stats.wickets < 10) {
+              newStatus = 'live';
+              newResult = null;
+              newWinner = null;
+            }
+          }
+        }
+      }
+
+      // 5. Dismiss any open end-of-over / end-of-innings dialogs
+      setShowBowlerModal(false);
+      setShowEndInningsModal(false);
+
+      // 6. Reconcile innings_data for scorecard tab
+      const existingInningsList = Array.isArray(matchData.innings_data) ? [...matchData.innings_data] : [];
+      const innIdx = existingInningsList.findIndex((inn) => inn.innings_number === currentInn);
+      const currentBatTeam = existingInningsList[innIdx]?.batting_team || existingInningsList[innIdx]?.team_name || (isFirst ? (matchData.current_batting_team || matchData.team_a_name) : (matchData.current_batting_team || matchData.team_b_name));
+      const currentInningsId = existingInningsList[innIdx]?.id || currentInnData?.id;
+
+      const updatedInningsObj = {
+        ...(existingInningsList[innIdx] || {}),
+        id: currentInningsId || existingInningsList[innIdx]?.id,
+        match_id: matchData.id,
+        innings_number: currentInn,
+        team_name: currentBatTeam,
+        batting_team: currentBatTeam,
+        runs: stats.runs,
+        total_runs: stats.runs,
+        wickets: stats.wickets,
+        overs: stats.overs,
+        overs_completed: Math.floor(stats.legalBalls / 6),
+        balls_completed: stats.legalBalls,
+        innings_status: 'live',
+        batters: stats.batters,
+        bowlers: stats.bowlers,
+        extras: stats.extras,
+        fall_of_wickets: stats.fallOfWickets
+      };
+
+      if (innIdx >= 0) {
+        existingInningsList[innIdx] = updatedInningsObj;
+      } else {
+        existingInningsList.push(updatedInningsObj);
+      }
+
+      if (currentInningsId) {
+        inningsService.updateInnings(currentInningsId, {
+          match_id: matchData.id,
+          total_runs: stats.runs,
+          wickets: stats.wickets,
+          overs_completed: Math.floor(stats.legalBalls / 6),
+          balls_completed: stats.legalBalls,
+          innings_status: 'live'
+        }).catch(err => console.warn('Innings undo sync note:', err));
+      }
+
+      // 7. Pop in-memory history stack
       setHistoryStack((prev) => prev.slice(1));
 
+      // 8. Build complete authoritative state
+      const isTeamA = currentBatTeam === matchData.team_a_name;
       const revertedState = {
-        ...(previousState || matchData),
-        team_a_score: isFirst ? stats.runs : matchData.team_a_score,
-        team_a_wickets: isFirst ? stats.wickets : matchData.team_a_wickets,
-        team_a_overs: isFirst ? stats.overs : matchData.team_a_overs,
-        team_b_score: !isFirst ? stats.runs : matchData.team_b_score,
-        team_b_wickets: !isFirst ? stats.wickets : matchData.team_b_wickets,
-        team_b_overs: !isFirst ? stats.overs : matchData.team_b_overs,
+        ...matchData,
+        status: newStatus,
+        result: newResult,
+        winner_team: newWinner,
+        team_a_score: isTeamA ? stats.runs : matchData.team_a_score,
+        team_a_wickets: isTeamA ? stats.wickets : matchData.team_a_wickets,
+        team_a_overs: isTeamA ? stats.overs : matchData.team_a_overs,
+        team_b_score: !isTeamA ? stats.runs : matchData.team_b_score,
+        team_b_wickets: !isTeamA ? stats.wickets : matchData.team_b_wickets,
+        team_b_overs: !isTeamA ? stats.overs : matchData.team_b_overs,
+        striker: restoredStriker,
+        non_striker: restoredNonStriker,
+        bowler: restoredBowler,
         recent_balls: stats.recentBalls,
         current_over_deliveries: stats.currentOverDeliveries,
-        completed_overs: stats.completedOvers
+        completed_overs: stats.completedOvers,
+        total_deliveries: remainingBalls.length,
+        innings_data: existingInningsList
       };
 
       setMatchData(revertedState);
+
+      // 9. Synchronize to database
       await matchService.updateMatch(matchData.id, revertedState);
+
+      setSuccessMessage('Delivery undone successfully');
+      setTimeout(() => setSuccessMessage(null), 3000);
     } catch (err) {
       console.error('Undo error:', err);
       setErrorMessage(`Failed to undo delivery: ${err.message}`);
     } finally {
+      setIsUndoing(false);
       setIsSaving(false);
     }
   };
@@ -709,7 +1164,7 @@ export default function LiveMatch() {
   };
 
   const handleChangeBowlerConfirm = async () => {
-    const clean = newBowlerName.trim();
+    const clean = newBowlerName.trim().toUpperCase();
     if (!clean) return;
 
     setMatchData((prev) => {
@@ -749,19 +1204,40 @@ export default function LiveMatch() {
 
   const handleSavePlayerName = async (e) => {
     if (e) e.preventDefault();
-    const clean = editPlayerModal.name.trim();
+    const clean = editPlayerModal.name.trim().toUpperCase();
     if (!clean) return;
 
     setMatchData((prev) => {
       const updated = { ...prev };
+      const oldName = editPlayerModal.role === 'striker'
+        ? prev.striker?.name
+        : (editPlayerModal.role === 'non_striker' ? prev.non_striker?.name : prev.bowler?.name);
+
       if (editPlayerModal.role === 'striker') {
         updated.striker = { ...updated.striker, name: clean };
       } else if (editPlayerModal.role === 'non_striker') {
         updated.non_striker = { ...updated.non_striker, name: clean };
       } else if (editPlayerModal.role === 'bowler') {
         updated.bowler = { ...updated.bowler, name: clean };
-        updated.bowlers_history = Array.from(new Set([...(prev.bowlers_history || []), clean]));
+        updated.bowlers_history = Array.from(new Set([
+          ...(prev.bowlers_history || []).map(n => n === oldName ? clean : n),
+          clean
+        ]));
       }
+
+      // Also update name in innings_data if present
+      if (oldName && updated.innings_data) {
+        const curInn = updated.current_innings || 1;
+        updated.innings_data = updated.innings_data.map(inn => {
+          if (inn.innings_number === curInn) {
+            const updatedBatters = (inn.batters || []).map(b => b.name === oldName ? { ...b, name: clean } : b);
+            const updatedBowlers = (inn.bowlers || []).map(bw => bw.name === oldName ? { ...bw, name: clean } : bw);
+            return { ...inn, batters: updatedBatters, bowlers: updatedBowlers };
+          }
+          return inn;
+        });
+      }
+
       matchService.updateMatch(prev.id, updated).catch(console.warn);
       return updated;
     });
@@ -769,42 +1245,118 @@ export default function LiveMatch() {
     setEditPlayerModal({ isOpen: false, role: '', name: '' });
   };
 
-  const handleStartSecondInnings = async (e) => {
+  const handleStartNextInnings = async (e) => {
     if (e && e.preventDefault) e.preventDefault();
 
-    const strikerName = secondInningsForm.striker?.trim() || 'Opener 1';
-    const nonStrikerName = secondInningsForm.nonStriker?.trim() || 'Opener 2';
-    const bowlerName = secondInningsForm.bowler?.trim() || 'Opening Bowler';
+    const currentInn = matchData.current_innings || 1;
+    const nextInnNumber = currentInn + 1;
 
-    const target = currentRuns + 1;
-    const nextBatting = currentBowlingTeam;
-    const nextBowling = currentBattingTeam;
+    const strikerName = (secondInningsForm.striker?.trim() || 'Opener 1').toUpperCase();
+    const nonStrikerName = (secondInningsForm.nonStriker?.trim() || 'Opener 2').toUpperCase();
+    const bowlerName = (secondInningsForm.bowler?.trim() || 'Opening Bowler').toUpperCase();
+
+    let nextBatting = currentBowlingTeam;
+    let nextBowling = currentBattingTeam;
+
+    // Follow-on check in Test Cricket (at end of Innings 2)
+    if (isTestMatch && currentInn === 2 && nextInningsBattingChoice === 'follow_on') {
+      nextBatting = currentBattingTeam; // Team that batted in Inn 2 bats again
+      nextBowling = currentBowlingTeam;
+    }
 
     const newStriker = { name: strikerName, runs: 0, balls: 0, fours: 0, sixes: 0, notOut: true };
     const newNonStriker = { name: nonStrikerName, runs: 0, balls: 0, fours: 0, sixes: 0, notOut: true };
     const newBowler = { name: bowlerName, overs: '0.0', maidens: 0, runs: 0, wickets: 0, economy: '0.00' };
 
     const existingInningsList = [...(matchData.innings_data || [])];
-    const secondInningsObj = {
-      innings_number: 2,
+
+    // Mark current innings completed in list
+    const curIdx = existingInningsList.findIndex(i => i.innings_number === currentInn);
+    if (curIdx >= 0) {
+      existingInningsList[curIdx] = {
+        ...existingInningsList[curIdx],
+        runs: currentRuns,
+        total_runs: currentRuns,
+        wickets: currentWickets,
+        overs: currentOversStr,
+        overs_completed: Math.floor(currentLegalBalls / 6),
+        balls_completed: currentLegalBalls,
+        innings_status: 'completed'
+      };
+    }
+
+    // Calculate Target if moving into the final configured innings
+    let nextTarget = null;
+    if (!isTestMatch) {
+      // Limited Overs 2nd innings target
+      if (nextInnNumber === 2) {
+        nextTarget = currentRuns + 1;
+      }
+    } else {
+      if (nextInnNumber === maxConfiguredInnings) {
+        let bowlingTeamRuns = 0;
+        let battingTeamRuns = 0;
+
+        for (let i = 1; i <= currentInn; i++) {
+          const inn = existingInningsList.find(x => x.innings_number === i);
+          const runsScored = i === currentInn ? currentRuns : (inn?.total_runs ?? inn?.runs ?? 0);
+          const innBatTeam = inn?.batting_team || inn?.team_name || (i % 2 === 1 ? matchData.team_a_name : matchData.team_b_name);
+
+          if (innBatTeam === nextBowling) {
+            bowlingTeamRuns += runsScored;
+          } else if (innBatTeam === nextBatting) {
+            battingTeamRuns += runsScored;
+          }
+        }
+
+        nextTarget = Math.max(1, (bowlingTeamRuns - battingTeamRuns) + 1);
+      }
+    }
+
+    const nextInnIdx = existingInningsList.findIndex(inn => inn.innings_number === nextInnNumber);
+    const existingNextInn = nextInnIdx >= 0 ? existingInningsList[nextInnIdx] : null;
+
+    const newInningsObj = {
+      ...(existingNextInn || {}),
+      id: existingNextInn?.id || (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `inn-${matchData.id}-${nextInnNumber}`),
+      match_id: matchData.id,
+      innings_number: nextInnNumber,
       team_name: nextBatting,
+      batting_team: nextBatting,
+      bowling_team: nextBowling,
       runs: 0,
+      total_runs: 0,
       wickets: 0,
       overs: '0.0',
+      overs_completed: 0,
+      balls_completed: 0,
+      innings_status: 'live',
+      target: nextTarget,
       batters: [newStriker, newNonStriker],
       bowlers: [newBowler],
       extras: { wides: 0, noballs: 0, byes: 0, legbyes: 0, total: 0 }
     };
 
+    if (nextInnIdx >= 0) {
+      existingInningsList[nextInnIdx] = newInningsObj;
+    } else {
+      existingInningsList.push(newInningsObj);
+    }
+    existingInningsList.sort((a, b) => (a.innings_number || 0) - (b.innings_number || 0));
+
+    const isNextTeamA = nextBatting === matchData.team_a_name;
     const nextState = {
       ...matchData,
-      current_innings: 2,
-      target: target,
+      current_innings: nextInnNumber,
+      target: nextTarget,
       current_batting_team: nextBatting,
       current_bowling_team: nextBowling,
-      team_b_score: 0,
-      team_b_wickets: 0,
-      team_b_overs: '0.0',
+      team_a_score: isNextTeamA ? 0 : matchData.team_a_score,
+      team_a_wickets: isNextTeamA ? 0 : matchData.team_a_wickets,
+      team_a_overs: isNextTeamA ? '0.0' : matchData.team_a_overs,
+      team_b_score: !isNextTeamA ? 0 : matchData.team_b_score,
+      team_b_wickets: !isNextTeamA ? 0 : matchData.team_b_wickets,
+      team_b_overs: !isNextTeamA ? '0.0' : matchData.team_b_overs,
       striker: newStriker,
       non_striker: newNonStriker,
       bowler: newBowler,
@@ -812,16 +1364,42 @@ export default function LiveMatch() {
       current_over_deliveries: [],
       completed_overs: [],
       bowlers_history: [bowlerName],
-      innings_data: [...existingInningsList.filter(inn => inn.innings_number !== 2), secondInningsObj]
+      innings_data: existingInningsList
     };
 
     setMatchData(nextState);
     setShowEndInningsModal(false);
+    setNextInningsBattingChoice(null);
+    setSecondInningsForm({ striker: '', nonStriker: '', bowler: '' });
+
+    // Mark current innings completed in database
+    const currentInningsId = currentInnData?.id || existingInningsList.find(i => i.innings_number === currentInn)?.id;
+    if (currentInningsId) {
+      inningsService.updateInnings(currentInningsId, {
+        match_id: matchData.id,
+        innings_status: 'completed',
+        total_runs: currentRuns,
+        wickets: currentWickets,
+        overs_completed: Math.floor(currentLegalBalls / 6),
+        balls_completed: currentLegalBalls
+      }).catch(err => console.warn('Innings complete sync note:', err));
+    }
+
+    // Mark next innings live in database
+    if (newInningsObj.id) {
+      inningsService.updateInnings(newInningsObj.id, {
+        match_id: matchData.id,
+        batting_team: nextBatting,
+        bowling_team: nextBowling,
+        innings_status: 'live',
+        target: nextTarget
+      }).catch(err => console.warn('Innings live sync note:', err));
+    }
 
     try {
       await matchService.updateMatch(matchData.id, nextState);
     } catch (err) {
-      console.warn('Failed to start 2nd innings on server:', err);
+      console.warn('Failed to start next innings on server:', err);
       setErrorMessage(`Server sync warning: ${err.message}`);
     }
   };
@@ -919,9 +1497,9 @@ export default function LiveMatch() {
 
       {/* On Hold Status Banner */}
       {matchData.status === 'on_hold' && (
-        <div className="bg-amber-500/15 border border-amber-500/40 text-amber-300 px-3 py-2 rounded-xl text-xs font-bold flex items-center justify-between gap-2 shadow-sm animate-fadeIn">
+        <div className="bg-amber-500/15 border border-amber-500/40 text-amber-800 dark:text-amber-300 px-3 py-2 rounded-xl text-xs font-bold flex items-center justify-between gap-2 shadow-sm animate-fadeIn">
           <div className="flex items-center gap-2">
-            <Pause className="w-4 h-4 text-amber-400 flex-shrink-0 animate-pulse" />
+            <Pause className="w-4 h-4 text-amber-600 dark:text-amber-400 flex-shrink-0 animate-pulse" />
             <span>Match is ON HOLD (Paused)</span>
           </div>
           <button
@@ -969,6 +1547,23 @@ export default function LiveMatch() {
         </div>
       )}
 
+      {/* Success Notification Alert */}
+      {successMessage && (
+        <div className="bg-emerald-500/20 border border-emerald-500/50 text-emerald-200 px-3 py-2 rounded-xl text-xs font-semibold flex items-center justify-between gap-2 shadow-sm animate-fadeIn">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+            <span>{successMessage}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setSuccessMessage(null)}
+            className="text-emerald-300 hover:text-white font-bold px-1.5 py-0.5 rounded cursor-pointer"
+          >
+            ×
+          </button>
+        </div>
+      )}
+
       {/* Main Scoring Area */}
       {activeTab === 'live' ? (
         <div className="flex flex-col gap-2 w-full max-w-[500px] mx-auto">
@@ -979,7 +1574,7 @@ export default function LiveMatch() {
             runs={currentRuns}
             wickets={currentWickets}
             legalBalls={currentLegalBalls}
-            totalOvers={matchData.overs || 16}
+            totalOvers={oversPerInnings}
             striker={matchData.striker}
             nonStriker={matchData.non_striker}
             bowler={matchData.bowler}
@@ -989,14 +1584,17 @@ export default function LiveMatch() {
             currentOverDeliveries={matchData.current_over_deliveries || []}
             completedOvers={matchData.completed_overs || []}
             onEditPlayer={handleOpenEditPlayer}
+            isTest={matchData.match_type === 'test'}
+            inningsNumber={currentInnNum}
+            allInnings={matchData.innings_data || []}
           />
 
           {/* Result banner if match is complete */}
           {matchData.status === 'completed' && matchData.result && (
-            <div className="p-3.5 rounded-xl bg-gradient-to-r from-cyan-950/60 via-cyan-900/60 to-cyan-950/60 border border-cyan-500/40 text-center shadow-lg">
-              <div className="text-sm font-black text-amber-300 flex items-center justify-center gap-2">
-                <Trophy className="w-4 h-4 text-amber-400" />
-                <span>{matchData.result}</span>
+            <div className="p-3.5 rounded-xl bg-amber-500/10 dark:bg-[#0c162c] border-2 border-amber-500/70 dark:border-amber-400 text-center shadow-lg dark:shadow-[0_0_20px_rgba(245,158,11,0.22)]">
+              <div className="text-sm sm:text-base font-black text-amber-900 dark:text-amber-300 flex items-center justify-center gap-2.5">
+                <Trophy className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0 drop-shadow-sm" />
+                <span className="tracking-wide">{matchData.result}</span>
               </div>
             </div>
           )}
@@ -1009,8 +1607,9 @@ export default function LiveMatch() {
               onUndo={handleUndo}
               onSwapStrike={handleSwapStrike}
               onChangeBowler={() => setShowBowlerModal(true)}
-              onEndInnings={isFirstInnings ? () => setShowEndInningsModal(true) : null}
-              canUndo={historyStack.length > 0}
+              onEndInnings={(currentInnNum < maxConfiguredInnings) ? () => setShowEndInningsModal(true) : null}
+              canUndo={canPerformUndo}
+              isUndoing={isUndoing}
               strikerName={matchData.striker?.name}
               nonStrikerName={matchData.non_striker?.name}
               bowlerName={matchData.bowler?.name}
@@ -1019,6 +1618,16 @@ export default function LiveMatch() {
             <div className="p-4 text-center ms-card bg-ms-bg-card border-ms-border rounded-xl space-y-2.5 shadow-md">
               <p className="text-sm text-ms-text-primary font-bold">Match concluded.</p>
               <div className="flex flex-wrap items-center justify-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleUndo}
+                  disabled={isUndoing || isSaving}
+                  className="py-2 px-3.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-600 text-xs font-bold cursor-pointer flex items-center gap-1.5 shadow-xs disabled:opacity-50"
+                  title="Reverse match-concluding delivery"
+                >
+                  {isUndoing ? <RotateCw className="w-3.5 h-3.5 animate-spin text-cyan-400" /> : <Undo2 className="w-3.5 h-3.5 text-cyan-400" />}
+                  <span>{isUndoing ? 'Undoing...' : 'Undo Match-Ending Ball'}</span>
+                </button>
                 <button
                   onClick={() => shareMatchResult(matchData)}
                   className="py-2 px-3.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold cursor-pointer flex items-center gap-1.5 shadow-xs"
@@ -1053,13 +1662,10 @@ export default function LiveMatch() {
       {showBowlerModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs animate-fadeIn">
           <div className="ms-card p-5 max-w-sm w-full bg-ms-bg-card border-ms-border shadow-2xl rounded-2xl">
-            <h3 className="text-base font-black text-ms-text-primary mb-1 flex items-center gap-2">
+            <h3 className="text-base font-black text-ms-text-primary mb-3 flex items-center gap-2">
               <RotateCw className="w-4 h-4 text-ms-cyan" />
               <span>Select Next Bowler</span>
             </h3>
-            <p className="text-xs text-ms-text-muted mb-3">
-              Tap a previous bowler or type a new bowler name:
-            </p>
 
             {/* Quick 1-Tap Chips of Previous Bowlers */}
             {previousBowlers.length > 0 && (
@@ -1077,7 +1683,7 @@ export default function LiveMatch() {
                       }}
                       className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
                         newBowlerName === bName
-                          ? 'bg-ms-cyan text-ms-text-inverse shadow-sm'
+                          ? 'bg-ms-cyan text-slate-950 font-black shadow-sm'
                           : 'bg-ms-bg-card border border-ms-border text-ms-text-primary hover:border-ms-cyan'
                       }`}
                     >
@@ -1094,9 +1700,9 @@ export default function LiveMatch() {
               <input
                 type="text"
                 value={newBowlerName}
-                onChange={(e) => setNewBowlerName(e.target.value)}
+                onChange={(e) => setNewBowlerName(e.target.value.toUpperCase())}
                 placeholder="e.g. Next Bowler"
-                className="ms-input text-sm py-2"
+                className="ms-input text-sm py-2 uppercase"
                 autoFocus
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') handleChangeBowlerConfirm();
@@ -1119,7 +1725,7 @@ export default function LiveMatch() {
                 type="button"
                 onClick={handleChangeBowlerConfirm}
                 disabled={!newBowlerName.trim()}
-                className="flex-1 py-2 rounded-xl bg-ms-cyan hover:bg-ms-cyan-light text-ms-text-inverse text-xs font-black shadow-md cursor-pointer disabled:opacity-50"
+                className="flex-1 py-2 rounded-xl bg-ms-cyan hover:bg-ms-cyan-light text-slate-950 text-xs font-black shadow-md cursor-pointer disabled:opacity-50"
               >
                 Confirm Bowler
               </button>
@@ -1145,9 +1751,9 @@ export default function LiveMatch() {
             <input
               type="text"
               value={editPlayerModal.name}
-              onChange={(e) => setEditPlayerModal({ ...editPlayerModal, name: e.target.value })}
+              onChange={(e) => setEditPlayerModal({ ...editPlayerModal, name: e.target.value.toUpperCase() })}
               placeholder="Enter player name"
-              className="ms-input text-sm py-2 mb-4"
+              className="ms-input text-sm py-2 mb-4 uppercase"
               autoFocus
               required
             />
@@ -1162,7 +1768,7 @@ export default function LiveMatch() {
               </button>
               <button
                 type="submit"
-                className="flex-1 py-2 rounded-xl bg-ms-cyan hover:bg-ms-cyan-light text-ms-text-inverse text-xs font-black shadow-md cursor-pointer"
+                className="flex-1 py-2 rounded-xl bg-ms-cyan hover:bg-ms-cyan-light text-slate-950 text-xs font-black shadow-md cursor-pointer"
               >
                 Save Name
               </button>
@@ -1171,92 +1777,191 @@ export default function LiveMatch() {
         </div>
       )}
 
-      {/* End Innings & Start 2nd Innings Modal */}
-      {showEndInningsModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs animate-fadeIn overflow-y-auto">
-          <div className="ms-card p-5 max-w-sm w-full bg-ms-bg-card border-ms-border shadow-2xl rounded-2xl text-left my-auto">
-            <div className="text-center mb-3">
-              <Trophy className="w-8 h-8 text-amber-400 mx-auto mb-1.5" />
-              <h3 className="text-base font-black text-ms-text-primary">
-                End of 1st Innings
-              </h3>
-              <p className="text-xs text-ms-text-secondary mt-0.5">
-                {currentBattingTeam} scored <strong>{currentRuns}/{currentWickets}</strong> in {currentOversStr} ov.
-              </p>
-              <div className="p-2.5 bg-ms-bg-input rounded-xl border border-ms-border mt-2">
-                <span className="text-[11px] text-ms-text-muted block">Target for {currentBowlingTeam}:</span>
-                <span className="text-xl font-black text-ms-cyan font-mono">{currentRuns + 1} Runs</span>
+      {/* End Innings & Start Next Innings Modal */}
+      {showEndInningsModal && (() => {
+        const curInn = matchData.current_innings || 1;
+        const nextInn = curInn + 1;
+        const existingInns = matchData.innings_data || [];
+
+        // Check follow-on eligibility after Innings 2 in Test Cricket (if match has at least 3 innings)
+        // Innings 1: Team A, Innings 2: Team B
+        let isFollowOnEligible = false;
+        let followOnLead = 0;
+        if (isTestMatch && curInn === 2 && maxConfiguredInnings >= 3) {
+          const inn1Runs = existingInns.find(i => i.innings_number === 1)?.runs || 0;
+          const inn2Runs = currentRuns;
+          followOnLead = inn1Runs - inn2Runs;
+          const threshold = (oversPerInnings <= 25) ? 50 : 75;
+          if (followOnLead >= threshold) {
+            isFollowOnEligible = true;
+          }
+        }
+
+        const effectiveBattingChoice = nextInningsBattingChoice || 'normal';
+        let upcomingBattingTeam = currentBowlingTeam;
+        let upcomingBowlingTeam = currentBattingTeam;
+
+        if (isTestMatch && curInn === 2 && maxConfiguredInnings >= 3 && effectiveBattingChoice === 'follow_on') {
+          upcomingBattingTeam = currentBattingTeam; // Team B follows on
+          upcomingBowlingTeam = currentBowlingTeam;
+        }
+
+        const inningsName = curInn === 1 ? '1st' : curInn === 2 ? '2nd' : curInn === 3 ? '3rd' : `${curInn}th`;
+        const nextInningsName = nextInn === 2 ? '2nd' : nextInn === 3 ? '3rd' : nextInn === 4 ? '4th' : `${nextInn}th`;
+
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs animate-fadeIn overflow-y-auto">
+            <div className="ms-card p-5 max-w-sm w-full bg-ms-bg-card border-ms-border shadow-2xl rounded-2xl text-left my-auto">
+              <div className="text-center mb-3">
+                <Trophy className="w-8 h-8 text-black dark:text-white mx-auto mb-1.5" />
+                <h3 className="text-base font-black text-ms-text-primary">
+                  End of {inningsName} Innings
+                </h3>
+                <p className="text-xs text-ms-text-secondary mt-0.5">
+                  {currentBattingTeam} scored <strong className="font-score font-bold tabular-nums">{currentRuns}/{currentWickets}</strong> in <span className="font-score font-semibold tabular-nums">{currentOversStr}</span> ov.
+                </p>
+
+                {/* Status or Target Equation */}
+                {!isTestMatch ? (
+                  <div className="p-2.5 bg-ms-bg-input rounded-xl border border-ms-border mt-2">
+                    <span className="text-[11px] text-ms-text-muted block">Target for {currentBowlingTeam}:</span>
+                    <span className="text-xl font-bold text-ms-cyan font-score tabular-nums">{currentRuns + 1} Runs</span>
+                  </div>
+                ) : (
+                  <div className="p-2 bg-ms-bg-input rounded-xl border border-ms-border mt-2 text-xs">
+                    {nextInn === maxConfiguredInnings ? (
+                      <span className="text-ms-text-secondary font-bold text-ms-cyan">
+                        Innings {curInn} concluded. Final {nextInningsName} Innings upcoming — target will be calculated for chase!
+                      </span>
+                    ) : (
+                      <div className="space-y-1">
+                        <span className="text-ms-text-secondary">
+                          {currentBowlingTeam} will now bat in the {nextInningsName} Innings.
+                        </span>
+                        {curInn === 2 && maxConfiguredInnings >= 3 && (
+                          <span className="text-ms-text-primary font-bold block">
+                            {followOnLead >= 0
+                              ? `${currentBowlingTeam} leads by ${followOnLead} runs.`
+                              : `${currentBattingTeam} leads by ${Math.abs(followOnLead)} runs.`}
+                          </span>
+                        )}
+                        {isFollowOnEligible && (
+                          <span className="text-amber-800 dark:text-amber-400 font-bold block text-[11px]">
+                            ⚡ Follow-on eligible! Lead of {followOnLead} runs satisfies threshold.
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
+
+              {/* Follow-on Decision Switcher if eligible at end of Innings 2 */}
+              {isTestMatch && curInn === 2 && isFollowOnEligible && (
+                <div className="mb-3 p-2.5 rounded-xl bg-amber-500/15 border border-amber-500/30">
+                  <div className="text-[11px] font-bold text-amber-800 dark:text-amber-300 mb-1.5 flex items-center justify-between">
+                    <span>Captain's Follow-On Choice:</span>
+                    <span className="text-[10px] uppercase font-mono px-1 rounded bg-amber-500/20">Decision</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setNextInningsBattingChoice('normal')}
+                      className={`py-1.5 px-2 rounded-lg text-xs font-bold transition-all cursor-pointer text-center ${
+                        effectiveBattingChoice === 'normal'
+                          ? 'bg-ms-cyan text-ms-text-inverse shadow-xs'
+                          : 'bg-ms-bg-input text-ms-text-secondary hover:text-ms-text-primary border border-ms-border'
+                      }`}
+                    >
+                      Bat Again ({currentBowlingTeam})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setNextInningsBattingChoice('follow_on')}
+                      className={`py-1.5 px-2 rounded-lg text-xs font-bold transition-all cursor-pointer text-center ${
+                        effectiveBattingChoice === 'follow_on'
+                          ? 'bg-amber-500 text-slate-950 font-black shadow-xs'
+                          : 'bg-ms-bg-input text-ms-text-secondary hover:text-ms-text-primary border border-ms-border'
+                      }`}
+                    >
+                      Enforce Follow-On
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Next Innings Players Entry */}
+              <form onSubmit={handleStartNextInnings} className="space-y-2.5 border-t border-ms-border pt-3">
+                <div className="text-xs font-bold text-ms-cyan uppercase tracking-wider flex items-center gap-1">
+                  <User className="w-3.5 h-3.5" />
+                  <span>{nextInningsName} Innings Opening Players</span>
+                </div>
+
+                <div>
+                  <label className="ms-input-label text-[11px] font-semibold text-ms-text-secondary">
+                    Opening Striker ({upcomingBattingTeam}) *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. BATTER 1"
+                    value={secondInningsForm.striker}
+                    onChange={(e) => setSecondInningsForm((prev) => ({ ...prev, striker: e.target.value.toUpperCase() }))}
+                    className="ms-input text-xs py-1.5 uppercase"
+                  />
+                </div>
+
+                <div>
+                  <label className="ms-input-label text-[11px] font-semibold text-ms-text-secondary">
+                    Opening Non-Striker ({upcomingBattingTeam}) *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. BATTER 2"
+                    value={secondInningsForm.nonStriker}
+                    onChange={(e) => setSecondInningsForm((prev) => ({ ...prev, nonStriker: e.target.value.toUpperCase() }))}
+                    className="ms-input text-xs py-1.5 uppercase"
+                  />
+                </div>
+
+                <div>
+                  <label className="ms-input-label text-[11px] font-semibold text-ms-text-secondary">
+                    Opening Bowler ({upcomingBowlingTeam}) *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. BOWLER 1"
+                    value={secondInningsForm.bowler}
+                    onChange={(e) => setSecondInningsForm((prev) => ({ ...prev, bowler: e.target.value.toUpperCase() }))}
+                    className="ms-input text-xs py-1.5 uppercase"
+                  />
+                </div>
+
+                <div className="flex items-center gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowEndInningsModal(false);
+                      setNextInningsBattingChoice(null);
+                    }}
+                    className="flex-1 py-2 rounded-xl bg-ms-bg-elevated text-ms-text-secondary hover:text-ms-text-primary border border-ms-border text-xs font-bold cursor-pointer text-center"
+                  >
+                    Keep Scoring {inningsName}
+                  </button>
+                  <button
+                    type="submit"
+                    className="flex-1 py-2 rounded-xl bg-ms-cyan hover:bg-ms-cyan-light text-slate-950 text-xs font-black shadow-md cursor-pointer text-center"
+                  >
+                    Start {nextInningsName} Innings
+                  </button>
+                </div>
+              </form>
             </div>
-
-            {/* 2nd Innings Players Entry */}
-            <form onSubmit={handleStartSecondInnings} className="space-y-2.5 border-t border-ms-border pt-3">
-              <div className="text-xs font-bold text-ms-cyan uppercase tracking-wider flex items-center gap-1">
-                <User className="w-3.5 h-3.5" />
-                <span>2nd Innings Opening Players</span>
-              </div>
-
-              <div>
-                <label className="ms-input-label text-[11px] font-semibold text-ms-text-secondary">
-                  Opening Striker ({currentBowlingTeam}) *
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Batter 1"
-                  value={secondInningsForm.striker}
-                  onChange={(e) => setSecondInningsForm((prev) => ({ ...prev, striker: e.target.value }))}
-                  className="ms-input text-xs py-1.5"
-                />
-              </div>
-
-              <div>
-                <label className="ms-input-label text-[11px] font-semibold text-ms-text-secondary">
-                  Opening Non-Striker ({currentBowlingTeam}) *
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Batter 2"
-                  value={secondInningsForm.nonStriker}
-                  onChange={(e) => setSecondInningsForm((prev) => ({ ...prev, nonStriker: e.target.value }))}
-                  className="ms-input text-xs py-1.5"
-                />
-              </div>
-
-              <div>
-                <label className="ms-input-label text-[11px] font-semibold text-ms-text-secondary">
-                  Opening Bowler ({currentBattingTeam}) *
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Bowler 1"
-                  value={secondInningsForm.bowler}
-                  onChange={(e) => setSecondInningsForm((prev) => ({ ...prev, bowler: e.target.value }))}
-                  className="ms-input text-xs py-1.5"
-                />
-              </div>
-
-              <div className="flex items-center gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowEndInningsModal(false)}
-                  className="flex-1 py-2 rounded-xl bg-ms-bg-elevated text-ms-text-secondary hover:text-ms-text-primary border border-ms-border text-xs font-bold cursor-pointer text-center"
-                >
-                  Keep Scoring 1st
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 py-2 rounded-xl bg-ms-cyan hover:bg-ms-cyan-light text-ms-text-inverse text-xs font-black shadow-md cursor-pointer text-center"
-                >
-                  Start 2nd Innings
-                </button>
-              </div>
-            </form>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Match Actions Modal (Hold, Cancel, Delete) */}
       {showActionsModal && (
@@ -1283,7 +1988,7 @@ export default function LiveMatch() {
                 className="w-full p-3 rounded-xl bg-ms-bg-elevated hover:bg-ms-bg-elevated/70 border border-ms-border flex items-center gap-3 text-left transition-all cursor-pointer group"
               >
                 <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                  matchData.status === 'on_hold' ? 'bg-lime-500/15 text-lime-400' : 'bg-amber-500/15 text-amber-400'
+                  matchData.status === 'on_hold' ? 'bg-lime-500/15 text-lime-600 dark:text-lime-400' : 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
                 }`}>
                   {matchData.status === 'on_hold' ? <Play className="w-4 h-4 fill-current" /> : <Pause className="w-4 h-4" />}
                 </div>
@@ -1299,7 +2004,7 @@ export default function LiveMatch() {
                 disabled={matchData.status === 'cancelled'}
                 className="w-full p-3 rounded-xl bg-ms-bg-elevated hover:bg-ms-bg-elevated/70 border border-ms-border flex items-center gap-3 text-left transition-all cursor-pointer group disabled:opacity-40 disabled:cursor-not-allowed"
               >
-                <div className="w-9 h-9 rounded-lg bg-orange-500/15 text-orange-400 flex items-center justify-center flex-shrink-0">
+                <div className="w-9 h-9 rounded-lg bg-orange-500/15 text-orange-600 dark:text-orange-400 flex items-center justify-center flex-shrink-0">
                   <Ban className="w-4 h-4" />
                 </div>
                 <div className="text-xs font-bold text-ms-text-primary group-hover:text-orange-400 transition-colors">
@@ -1330,26 +2035,23 @@ export default function LiveMatch() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs animate-fadeIn">
           <div className="ms-card p-5 max-w-sm w-full bg-ms-bg-card border-orange-500/40 shadow-2xl rounded-2xl text-center">
             <Ban className="w-10 h-10 text-orange-400 mx-auto mb-2.5" />
-            <h3 className="text-base font-black text-ms-text-primary mb-1">
+            <h3 className="text-base font-black text-ms-text-primary mb-4">
               Cancel This Match?
             </h3>
-            <p className="text-xs text-ms-text-secondary mb-4">
-              Are you sure you want to mark this match as cancelled? Scoring will stop and the status will be broadcast as cancelled.
-            </p>
             <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={() => setCancelConfirmOpen(false)}
-                className="flex-1 py-2 rounded-xl bg-ms-bg-elevated text-ms-text-secondary hover:text-ms-text-primary border border-ms-border text-xs font-bold cursor-pointer"
+                className="flex-1 py-2.5 rounded-xl bg-ms-bg-elevated text-ms-text-secondary hover:text-ms-text-primary border border-ms-border text-xs font-bold cursor-pointer transition-colors"
               >
-                No, Keep Playing
+                No
               </button>
               <button
                 type="button"
                 onClick={handleConfirmCancelMatch}
-                className="flex-1 py-2 rounded-xl bg-orange-600 hover:bg-orange-500 text-white text-xs font-black shadow-md cursor-pointer"
+                className="flex-1 py-2.5 rounded-xl bg-orange-600 hover:bg-orange-500 text-white text-xs font-black shadow-md cursor-pointer transition-colors"
               >
-                Yes, Cancel Match
+                Yes
               </button>
             </div>
           </div>
@@ -1361,26 +2063,56 @@ export default function LiveMatch() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs animate-fadeIn">
           <div className="ms-card p-5 max-w-sm w-full bg-ms-bg-card border-red-500/50 shadow-2xl rounded-2xl text-center">
             <AlertTriangle className="w-10 h-10 text-red-400 mx-auto mb-2.5" />
-            <h3 className="text-base font-black text-ms-text-primary mb-1">
+            <h3 className="text-base font-black text-ms-text-primary mb-4">
               Permanently Delete Match?
             </h3>
-            <p className="text-xs text-ms-text-secondary mb-4">
-              This action cannot be undone. All ball-by-ball deliveries, wickets, and score records for <strong>{matchData.team_a_name} vs {matchData.team_b_name}</strong> will be erased from Supabase.
-            </p>
             <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={() => setDeleteConfirmOpen(false)}
-                className="flex-1 py-2 rounded-xl bg-ms-bg-elevated text-ms-text-secondary hover:text-ms-text-primary border border-ms-border text-xs font-bold cursor-pointer"
+                className="flex-1 py-2.5 rounded-xl bg-ms-bg-elevated text-ms-text-secondary hover:text-ms-text-primary border border-ms-border text-xs font-bold cursor-pointer transition-colors"
+              >
+                No
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDeleteMatch}
+                className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-black shadow-md cursor-pointer transition-colors"
+              >
+                Yes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Undo Confirmation Dialog (For Wickets & Concluded Match Events) */}
+      {undoConfirmModal.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-xs animate-fadeIn">
+          <div className="ms-card p-5 max-w-sm w-full bg-[#111e38] border border-cyan-500/50 shadow-2xl rounded-2xl text-center text-white">
+            <div className="w-10 h-10 rounded-full bg-cyan-500/20 border border-cyan-400 flex items-center justify-center mx-auto mb-3">
+              <Undo2 className="w-5 h-5 text-cyan-400" />
+            </div>
+            <h3 className="text-base font-black text-white mb-1.5">
+              {undoConfirmModal.title}
+            </h3>
+            <p className="text-xs text-slate-300 leading-relaxed mb-4">
+              {undoConfirmModal.message}
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setUndoConfirmModal({ isOpen: false, title: '', message: '' })}
+                className="flex-1 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-600 text-xs font-bold cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 type="button"
-                onClick={handleConfirmDeleteMatch}
-                className="flex-1 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-black shadow-md cursor-pointer"
+                onClick={executeUndo}
+                className="flex-1 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 text-xs font-black shadow-md cursor-pointer"
               >
-                Delete Forever
+                Confirm Undo
               </button>
             </div>
           </div>

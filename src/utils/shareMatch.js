@@ -139,3 +139,15 @@ export function formatMatchDate(dateStr) {
     return 'Match';
   }
 }
+
+export function formatMatchTime(dateStr) {
+  if (!dateStr) return '';
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return '';
+    return d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', hour12: true });
+  } catch {
+    return '';
+  }
+}
+

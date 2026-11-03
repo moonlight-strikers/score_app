@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { formatOvers, calculateRunRate, calculateRequiredRunRate, calculateMatchEquation } from '../utils/cricketRules';
 import { Edit2, History, X } from 'lucide-react';
+import { CricketBatIcon, DotBallIcon } from './CricketIcons';
 
 export default function Scoreboard({
   battingTeam = 'Team A',
@@ -17,7 +18,10 @@ export default function Scoreboard({
   recentBalls = [],
   currentOverDeliveries = [],
   completedOvers = [],
-  onEditPlayer = () => {}
+  onEditPlayer = () => {},
+  isTest = false,
+  inningsNumber = 1,
+  allInnings = []
 }) {
   const [showHistoryModal, setShowHistoryModal] = useState(false);
 
@@ -34,11 +38,9 @@ export default function Scoreboard({
   const currentOverNumber = Math.floor(legalBalls / 6) + (isOverJustFinished ? 0 : 1);
 
   // Strictly get only the deliveries of the current over
-  const thisOverDeliveries = (currentOverDeliveries && currentOverDeliveries.length > 0)
+  const thisOverDeliveries = Array.isArray(currentOverDeliveries)
     ? currentOverDeliveries
-    : (recentBalls && recentBalls.length > 0)
-      ? recentBalls.slice(-(ballsInCurrentOver || (isOverJustFinished ? 6 : 0)))
-      : [];
+    : [];
 
   // Compute this over runs
   const thisOverRuns = thisOverDeliveries.reduce((acc, b) => {
@@ -50,15 +52,29 @@ export default function Scoreboard({
   const strikerSr = striker?.balls ? ((striker.runs / striker.balls) * 100).toFixed(1) : '0.0';
   const nonStrikerSr = nonStriker?.balls ? ((nonStriker.runs / nonStriker.balls) * 100).toFixed(1) : '0.0';
 
-  // Ball badge: white background and black numbers for crystal clear visibility
+  // Ball badge: render custom DotBallIcon for dot deliveries, colored badges for runs/wickets/extras
   const renderBallBadge = (ball, idx) => {
     const isW = ball.includes('W') && !ball.includes('Wd');
     const is4 = ball === '4';
     const is6 = ball === '6';
-    const isExtra = ball.includes('Wd') || ball.includes('Nb');
+    const isExtra = ball.includes('Wd') || ball.includes('Nb') || ball.includes('Lb') || ball.includes('B');
+    const isDot = ball === '0' || ball === '•';
 
-    // User requirement: white background and black numbers for high contrast
-    let badgeClass = 'bg-white text-black font-black border border-slate-200 shadow-xs';
+    // Dot ball representation: concentric circle with inner solid dot as in reference image
+    if (isDot) {
+      return (
+        <span
+          key={idx}
+          className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 text-slate-900 dark:text-white"
+          title="Dot ball (0 runs)"
+        >
+          <DotBallIcon className="w-5 h-5 text-slate-900 dark:text-white" />
+        </span>
+      );
+    }
+
+    // User requirement: In light theme, this over runs number background circle in black and text in white colour
+    let badgeClass = 'bg-black text-white dark:bg-white dark:text-black font-black border border-black dark:border-slate-200 shadow-xs';
     if (isW) {
       badgeClass = 'bg-red-600 text-white font-black border-red-500 shadow-xs';
     } else if (is4) {
@@ -72,7 +88,7 @@ export default function Scoreboard({
     return (
       <span
         key={idx}
-        className={`w-7 h-7 rounded-full border flex items-center justify-center font-mono text-xs leading-none flex-shrink-0 ${badgeClass}`}
+        className={`w-7 h-7 rounded-full border flex items-center justify-center font-score font-bold text-xs leading-none flex-shrink-0 tabular-nums ${badgeClass}`}
       >
         {ball}
       </span>
@@ -83,97 +99,172 @@ export default function Scoreboard({
     <div className="w-full space-y-2 select-none">
       {/* Target Equation Bar (if 2nd innings) */}
       {equation && (
-        <div className="bg-amber-500/15 border border-amber-500/30 text-amber-300 px-3 py-1 text-xs font-bold text-center tracking-wide rounded-lg shadow-xs">
-          <span>{equation}</span>
-          {rrr && <span className="ml-2 text-slate-300">• Req RR: <strong className="text-amber-300">{rrr}</strong></span>}
+        <div className="bg-amber-500/10 dark:bg-amber-500/15 border border-amber-500/30 text-amber-700 dark:text-amber-300 px-3 py-1.5 text-xs font-semibold text-center tracking-wide rounded-xl shadow-xs flex items-center justify-center">
+          <span className="font-score font-bold text-sm tracking-normal tabular-nums">{equation}</span>
         </div>
       )}
 
-      {/* Main Scorecard Banner Card — Exact Match with User Screenshot */}
-      <div className="relative overflow-hidden rounded-2xl border border-cyan-500/30 bg-[#0a1633] p-3.5 shadow-xl text-white">
-        {/* Subtle accent line */}
-        <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-cyan-400 to-transparent opacity-75" />
+      {/* Multi-Innings Score Breakdown (Displays only configured innings for match) */}
+      {allInnings && allInnings.length > 0 && (
+        <div className="p-2.5 rounded-xl border border-slate-200/90 dark:border-cyan-500/30 bg-white/95 dark:bg-[#0a1633]/90 shadow-xs space-y-1">
+          {allInnings.map((inn, idx) => {
+            const innNum = Number(inn.innings_number || idx + 1);
+            const isCurrent = innNum === Number(inningsNumber);
+            const hasBatted = inn.runs > 0 || inn.wickets > 0 || (inn.overs && inn.overs !== '0.0') || inn.innings_status === 'completed';
+            const suffix = innNum === 1 ? '1st' : innNum === 2 ? '2nd' : innNum === 3 ? '3rd' : `${innNum}th`;
+            const innTeam = inn.batting_team || inn.team_name || `Innings ${innNum}`;
 
-        {/* Top: Team Name + Giant Score with inline overs + RUN RATE box */}
-        <div className="flex items-center justify-between pb-3 border-b border-cyan-500/20">
-          <div>
-            <span className="text-xs text-cyan-300 font-bold uppercase tracking-wider block">
+            return (
+              <div
+                key={innNum}
+                className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs transition-colors ${
+                  isCurrent
+                    ? 'bg-cyan-500/15 border border-cyan-500/40 text-slate-900 dark:text-white font-bold'
+                    : 'text-slate-600 dark:text-slate-300 bg-slate-50/50 dark:bg-white/[0.03]'
+                }`}
+              >
+                <div className="flex items-center gap-1.5 truncate min-w-0">
+                  <span className="font-semibold text-slate-900 dark:text-white truncate">
+                    {innTeam}
+                  </span>
+                  <span className="text-slate-400">–</span>
+                  {isCurrent ? (
+                    <span className="font-score font-bold text-cyan-600 dark:text-cyan-400 tabular-nums">
+                      {runs}/{wickets} ({oversFormatted} Overs)
+                    </span>
+                  ) : hasBatted ? (
+                    <span className="font-score font-semibold tabular-nums text-slate-800 dark:text-slate-200">
+                      {inn.total_runs ?? inn.runs ?? 0}/{inn.wickets ?? 0} ({inn.overs || formatOvers(inn.balls_completed || 0)} Overs)
+                    </span>
+                  ) : (
+                    <span className="italic text-slate-400 dark:text-slate-500">
+                      Yet to Bat
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-1.5 flex-shrink-0 ml-2">
+                  <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                    – {suffix} Innings
+                  </span>
+                  {isCurrent && (
+                    <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-cyan-500 text-slate-950">
+                      LIVE
+                    </span>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Main Scorecard Banner Card */}
+      <div className="relative overflow-hidden rounded-2xl border border-slate-200/90 dark:border-cyan-500/30 bg-white dark:bg-[#0a1633] p-3.5 shadow-md shadow-slate-200/60 dark:shadow-none text-slate-800 dark:text-white transition-colors">
+        {/* Subtle accent line */}
+        <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-cyan-500 to-transparent opacity-60 dark:opacity-75" />
+
+        {/* Main Scoreboard: Team, Prominent Center-Aligned Score, Overs, and CRR in right corner */}
+        <div className="relative pb-2.5 border-b border-slate-200/80 dark:border-cyan-500/20 text-center">
+          {/* Team & Innings Indicator */}
+          <div className="flex items-center justify-center gap-2 mb-1">
+            <span className="text-xs sm:text-sm text-cyan-700 dark:text-cyan-300 font-semibold uppercase tracking-wider">
               {battingTeam} Batting
             </span>
-            <div className="flex items-baseline gap-2.5 mt-1">
-              <span className="font-mono font-black text-5xl sm:text-6xl text-amber-400 tracking-tight drop-shadow-md">
-                {runs}<span className="text-white/60 font-light text-3xl sm:text-4xl">/</span>{wickets}
+            {isTest && (
+              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-600 dark:text-amber-300 border border-amber-500/30">
+                {inningsNumber === 1 ? '1st Inn' : inningsNumber === 2 ? '2nd Inn' : inningsNumber === 3 ? '3rd Inn' : `${inningsNumber}th Inn`}
               </span>
-              <span className="text-sm sm:text-base font-bold text-cyan-200/90 font-mono">
-                ({oversFormatted} / {totalOvers} ov)
-              </span>
-            </div>
+            )}
           </div>
 
-          {/* RUN RATE Box on Right */}
-          <div className="px-3.5 py-2 rounded-xl bg-cyan-950/70 border border-cyan-500/40 text-center min-w-[76px] shadow-sm">
-            <span className="text-[10px] text-cyan-300 uppercase font-black tracking-wider block">
-              RUN RATE
+          {/* 1. Main Score: Significantly larger, Barlow Condensed Bold, Center-Aligned, White in dark mode, Tabular */}
+          <div className="my-0.5 flex items-center justify-center">
+            <span className="font-score font-bold text-6xl sm:text-7xl text-slate-900 dark:text-white tabular-nums leading-none tracking-tight">
+              {runs}<span className="text-slate-400 dark:text-slate-400/80 font-light text-4xl sm:text-5xl mx-1">/</span>{wickets}
             </span>
-            <span className="font-mono font-black text-base sm:text-lg text-white">
-              {crr}
-            </span>
+          </div>
+
+          {/* 2. Overs: Directly below main score, Inter Medium with smaller size */}
+          <div className="font-sans font-medium text-xs sm:text-sm text-slate-500 dark:text-slate-300 mt-1 flex items-center justify-center gap-1">
+            <span className="font-score font-semibold tabular-nums text-sm sm:text-base text-slate-700 dark:text-slate-200">{oversFormatted}</span>
+            <span className="text-slate-400 dark:text-slate-500 font-light">/</span>
+            <span className="font-score font-semibold tabular-nums text-sm sm:text-base text-slate-700 dark:text-slate-200">{totalOvers}</span>
+            <span className="text-[11px] font-medium tracking-wider uppercase text-slate-500 dark:text-slate-400 ml-0.5">OV</span>
+          </div>
+
+          {/* CRR positioned neatly in the right down corner of the run div */}
+          <div className="absolute right-0 bottom-2.5 flex items-center gap-1.5 text-xs font-sans">
+            <div className="flex items-center gap-1">
+              <span className="text-[10px] text-cyan-700 dark:text-cyan-400 font-semibold tracking-wider uppercase">CRR</span>
+              <span className="font-score font-bold text-xs sm:text-sm text-slate-900 dark:text-white tabular-nums">{crr}</span>
+            </div>
+            {target && rrr && (
+              <>
+                <span className="text-slate-300 dark:text-slate-600 font-light">•</span>
+                <div className="flex items-center gap-1">
+                  <span className="text-[10px] text-amber-600 dark:text-amber-400 font-semibold tracking-wider uppercase">RRR</span>
+                  <span className="font-score font-bold text-xs sm:text-sm text-amber-600 dark:text-amber-300 tabular-nums">{rrr}</span>
+                </div>
+              </>
+            )}
           </div>
         </div>
 
         {/* Middle: Active Batters Table */}
-        <div className="py-2.5 border-b border-cyan-500/20 space-y-1.5">
-          <div className="flex items-center justify-between text-[10px] text-slate-400 uppercase font-bold px-1">
+        <div className="py-2.5 border-b border-slate-200/80 dark:border-cyan-500/20 space-y-1.5">
+          <div className="flex items-center justify-between text-[10px] text-slate-400 dark:text-slate-400 uppercase font-semibold px-1">
             <span>BATTER</span>
-            <div className="flex items-center gap-4 font-mono">
+            <div className="flex items-center gap-4 font-score font-semibold text-[11px] tabular-nums">
               <span className="w-8 text-right">R</span>
               <span className="w-8 text-right">B</span>
               <span className="w-12 text-right">SR</span>
             </div>
           </div>
 
-          {/* Striker */}
-          <div className="flex items-center justify-between px-2.5 py-1.5 rounded-xl bg-cyan-950/40 border border-cyan-500/40">
+          {/* Striker (Current Batter indicated by Bat Logo as in reference image) */}
+          <div className="flex items-center justify-between px-2.5 py-1.5 rounded-xl bg-cyan-50/70 dark:bg-cyan-950/40 border border-cyan-300/80 dark:border-cyan-500/40">
             <div className="flex items-center gap-1.5 min-w-0 pr-2">
-              <span className="text-amber-400 text-xs font-black animate-pulse">▶</span>
-              <span className="font-bold text-sm text-white truncate">
+              <CricketBatIcon className="w-4.5 h-4.5 flex-shrink-0 drop-shadow-xs" />
+              <span className="font-semibold text-sm text-slate-900 dark:text-white truncate uppercase tracking-tight">
                 {striker?.name || 'Striker'}
               </span>
               <button
                 type="button"
                 onClick={() => onEditPlayer('striker', striker?.name || 'Striker')}
-                className="p-0.5 text-cyan-400 hover:text-white transition-colors cursor-pointer"
+                className="p-0.5 text-cyan-600 dark:text-cyan-400 hover:text-cyan-800 dark:hover:text-white transition-colors cursor-pointer"
                 title="Edit striker name"
               >
                 <Edit2 className="w-3 h-3" />
               </button>
             </div>
-            <div className="flex items-center gap-4 font-mono text-xs flex-shrink-0">
-              <span className="w-8 text-right font-black text-amber-400 text-sm">{striker?.runs ?? 0}</span>
-              <span className="w-8 text-right text-slate-300">{striker?.balls ?? 0}</span>
-              <span className="w-12 text-right text-cyan-300 font-semibold">{strikerSr}</span>
+            <div className="flex items-center gap-4 font-score text-xs flex-shrink-0 tabular-nums">
+              <span className="w-8 text-right font-bold text-amber-600 dark:text-amber-400 text-sm sm:text-base">{striker?.runs ?? 0}</span>
+              <span className="w-8 text-right text-slate-600 dark:text-slate-300 font-semibold">{striker?.balls ?? 0}</span>
+              <span className="w-12 text-right text-cyan-700 dark:text-cyan-300 font-semibold">{strikerSr}</span>
             </div>
           </div>
 
           {/* Non-Striker */}
-          <div className="flex items-center justify-between px-2.5 py-1.5 rounded-xl bg-slate-900/60 border border-slate-700/60">
-            <div className="flex items-center gap-1.5 min-w-0 pr-2 pl-3">
-              <span className="font-medium text-sm text-slate-200 truncate">
+          <div className="flex items-center justify-between px-2.5 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700/60">
+            <div className="flex items-center gap-1.5 min-w-0 pr-2">
+              <span className="w-4.5 h-4.5 flex-shrink-0 inline-block" aria-hidden="true" />
+              <span className="font-medium text-sm text-slate-700 dark:text-slate-200 truncate uppercase tracking-tight">
                 {nonStriker?.name || 'Non-Striker'}
               </span>
               <button
                 type="button"
                 onClick={() => onEditPlayer('non_striker', nonStriker?.name || 'Non-Striker')}
-                className="p-0.5 text-slate-400 hover:text-white transition-colors cursor-pointer"
+                className="p-0.5 text-slate-400 hover:text-slate-700 dark:hover:text-white transition-colors cursor-pointer"
                 title="Edit non-striker name"
               >
                 <Edit2 className="w-3 h-3" />
               </button>
             </div>
-            <div className="flex items-center gap-4 font-mono text-xs flex-shrink-0">
-              <span className="w-8 text-right font-bold text-white text-sm">{nonStriker?.runs ?? 0}</span>
-              <span className="w-8 text-right text-slate-400">{nonStriker?.balls ?? 0}</span>
-              <span className="w-12 text-right text-slate-300 font-semibold">{nonStrikerSr}</span>
+            <div className="flex items-center gap-4 font-score text-xs flex-shrink-0 tabular-nums">
+              <span className="w-8 text-right font-bold text-slate-800 dark:text-white text-sm sm:text-base">{nonStriker?.runs ?? 0}</span>
+              <span className="w-8 text-right text-slate-500 dark:text-slate-400 font-normal">{nonStriker?.balls ?? 0}</span>
+              <span className="w-12 text-right text-slate-600 dark:text-slate-300 font-normal">{nonStrikerSr}</span>
             </div>
           </div>
         </div>
@@ -181,40 +272,40 @@ export default function Scoreboard({
         {/* Bottom: Active Bowler & Figures */}
         <div className="pt-2 flex items-center justify-between gap-2">
           <div className="flex items-center gap-1.5 min-w-0">
-            <span className="text-[10px] text-cyan-300 uppercase font-black tracking-wider">
+            <span className="text-[10px] text-cyan-700 dark:text-cyan-300 uppercase font-semibold tracking-wider font-sans">
               BOWLER:
             </span>
-            <span className="font-bold text-sm text-white truncate max-w-[150px] sm:max-w-[200px]">
+            <span className="font-semibold text-sm text-slate-900 dark:text-white truncate max-w-[150px] sm:max-w-[200px] uppercase tracking-tight">
               {bowler?.name || 'Bowler'}
             </span>
             <button
               type="button"
               onClick={() => onEditPlayer('bowler', bowler?.name || 'Bowler')}
-              className="p-0.5 text-cyan-400 hover:text-white transition-colors cursor-pointer"
+              className="p-0.5 text-cyan-600 dark:text-cyan-400 hover:text-cyan-800 dark:hover:text-white transition-colors cursor-pointer"
               title="Edit bowler name"
             >
               <Edit2 className="w-3 h-3" />
             </button>
           </div>
 
-          <div className="bg-slate-900/80 border border-slate-700 px-2.5 py-1 rounded-lg text-xs font-mono flex items-center gap-1">
-            <span className="font-bold text-amber-300">{bowler?.wickets ?? 0}</span>
-            <span className="text-white/60">-</span>
-            <span className="font-bold text-white">{bowler?.runs ?? 0}</span>
-            <span className="text-slate-400 ml-1.5">({bowler?.overs ?? '0.0'} ov)</span>
+          <div className="bg-slate-100 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-700 px-2.5 py-1 rounded-lg text-xs font-score tabular-nums flex items-center gap-1 shadow-2xs">
+            <span className="font-bold text-amber-600 dark:text-amber-300 text-sm sm:text-base">{bowler?.wickets ?? 0}</span>
+            <span className="text-slate-400 dark:text-white/60 font-sans">-</span>
+            <span className="font-bold text-slate-900 dark:text-white text-sm sm:text-base">{bowler?.runs ?? 0}</span>
+            <span className="text-slate-500 dark:text-slate-400 ml-1.5 font-score font-semibold text-xs">({bowler?.overs ?? '0.0'} ov)</span>
           </div>
         </div>
       </div>
 
-      {/* Card 2: THIS OVER Strip — Exact Match with User Screenshot */}
-      <div className="rounded-xl bg-[#0c1730] border border-cyan-500/30 px-3 py-2 shadow-md flex items-center justify-between gap-2">
+      {/* Card 2: THIS OVER Strip */}
+      <div className="rounded-xl bg-white dark:bg-[#0c1730] border border-slate-200/90 dark:border-cyan-500/30 px-3 py-2 shadow-xs dark:shadow-none flex items-center justify-between gap-2 transition-colors">
         <div className="flex items-center gap-2 overflow-x-auto">
-          <span className="text-[10px] text-cyan-300 uppercase font-black tracking-wider whitespace-nowrap">
+          <span className="text-[10px] text-cyan-700 dark:text-cyan-300 uppercase font-semibold tracking-wider whitespace-nowrap font-sans">
             THIS OVER:
           </span>
           <div className="flex items-center gap-1.5">
             {thisOverDeliveries.length === 0 ? (
-              <span className="text-slate-400 text-xs italic">Ready...</span>
+              <span className="text-slate-400 text-xs italic font-sans">Ready...</span>
             ) : (
               thisOverDeliveries.map((ball, idx) => renderBallBadge(ball, idx))
             )}
@@ -222,14 +313,14 @@ export default function Scoreboard({
         </div>
 
         <div className="flex items-center gap-2 flex-shrink-0">
-          <span className="font-mono text-xs text-cyan-300 font-bold whitespace-nowrap">
+          <span className="font-score text-sm text-cyan-700 dark:text-cyan-300 font-bold whitespace-nowrap tabular-nums">
             {thisOverRuns} runs
           </span>
           {completedOvers && completedOvers.length > 0 && (
             <button
               type="button"
               onClick={() => setShowHistoryModal(true)}
-              className="p-1 rounded bg-slate-800 text-slate-400 hover:text-cyan-300 transition-colors cursor-pointer"
+              className="p-1 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-cyan-600 dark:hover:text-cyan-300 transition-colors cursor-pointer"
               title={`View ${completedOvers.length} completed overs`}
             >
               <History className="w-3.5 h-3.5" />
@@ -241,18 +332,18 @@ export default function Scoreboard({
       {/* Completed Overs Modal (Accessible via history icon without cluttering the main screen) */}
       {showHistoryModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs animate-fadeIn">
-          <div className="ms-card p-4 max-w-sm w-full bg-[#0d1830] border border-cyan-500/50 shadow-2xl rounded-2xl text-white">
-            <div className="flex items-center justify-between pb-2 mb-3 border-b border-cyan-500/20">
+          <div className="ms-card p-4 max-w-sm w-full bg-white dark:bg-[#0d1830] border border-slate-200 dark:border-cyan-500/50 shadow-2xl rounded-2xl text-slate-800 dark:text-white">
+            <div className="flex items-center justify-between pb-2 mb-3 border-b border-slate-200 dark:border-cyan-500/20">
               <div className="flex items-center gap-2">
-                <History className="w-4 h-4 text-cyan-400" />
-                <h3 className="text-sm font-black text-white">
+                <History className="w-4 h-4 text-cyan-600 dark:text-cyan-400" />
+                <h3 className="text-sm font-black text-slate-900 dark:text-white">
                   Completed Overs ({completedOvers.length})
                 </h3>
               </div>
               <button
                 type="button"
                 onClick={() => setShowHistoryModal(false)}
-                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer"
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-800 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -262,25 +353,25 @@ export default function Scoreboard({
               {completedOvers.slice().reverse().map((overItem, idx) => (
                 <div
                   key={idx}
-                  className="p-2.5 rounded-xl bg-slate-900/80 border border-slate-700/80 flex flex-col gap-1.5"
+                  className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-700/80 flex flex-col gap-1.5"
                 >
                   <div className="flex items-center justify-between text-xs">
                     <div className="flex items-center gap-1.5">
-                      <span className="font-mono font-bold text-cyan-300">
+                      <span className="font-score font-bold text-cyan-700 dark:text-cyan-300 tabular-nums">
                         Over {overItem.overNumber}
                       </span>
-                      <span className="text-slate-300 text-[11px] truncate max-w-[140px]">
+                      <span className="text-slate-600 dark:text-slate-300 text-[11px] truncate max-w-[140px]">
                         ({overItem.bowler})
                       </span>
                     </div>
 
                     <div className="flex items-center gap-1">
                       {overItem.runs === 0 && (
-                        <span className="text-[8px] uppercase font-black text-emerald-400 bg-emerald-500/20 px-1 py-0.2 rounded">
+                        <span className="text-[8px] uppercase font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/20 px-1 py-0.2 rounded font-sans">
                           Maiden
                         </span>
                       )}
-                      <span className="font-mono font-bold text-xs text-white">
+                      <span className="font-score font-bold text-xs text-slate-900 dark:text-white tabular-nums">
                         {overItem.runs} {overItem.runs === 1 ? 'run' : 'runs'}
                       </span>
                     </div>
@@ -296,7 +387,7 @@ export default function Scoreboard({
             <button
               type="button"
               onClick={() => setShowHistoryModal(false)}
-              className="w-full mt-3 py-2 rounded-xl bg-slate-800 text-slate-200 font-bold text-xs border border-slate-700 cursor-pointer hover:bg-slate-700"
+              className="w-full mt-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-bold text-xs border border-slate-300 dark:border-slate-700 cursor-pointer"
             >
               Close
             </button>

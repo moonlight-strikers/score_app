@@ -62,7 +62,9 @@ export default function ScoringPad({
     onScoreBall({
       runs: totalRuns,
       type,
-      batsmanRuns: type === BALL_TYPES.NO_BALL ? Number(extraRuns) : 0
+      batsmanRuns: type === BALL_TYPES.NO_BALL ? Number(extraRuns) : 0,
+      isFour: type === BALL_TYPES.NO_BALL && Number(extraRuns) === 4,
+      isSix: type === BALL_TYPES.NO_BALL && Number(extraRuns) === 6
     });
     setExtraModal(null);
     setExtraRuns(0);
@@ -116,7 +118,7 @@ export default function ScoringPad({
           <button
             type="button"
             onClick={() => onScoreBall({ runs: 0, type: BALL_TYPES.NORMAL })}
-            className="h-12 sm:h-14 rounded-xl bg-[#162544] hover:bg-[#1e325c] border border-slate-600/70 text-white font-mono text-2xl font-black flex items-center justify-center transition-all active:scale-95 shadow-md cursor-pointer hover:border-cyan-400/60"
+            className="h-14 sm:h-16 rounded-2xl bg-[#132038] hover:bg-[#1a2c4e] border border-slate-700/80 text-white font-score text-3xl sm:text-4xl font-bold flex items-center justify-center transition-all active:scale-95 shadow-md cursor-pointer hover:border-cyan-400/60"
           >
             0
           </button>
@@ -125,7 +127,7 @@ export default function ScoringPad({
           <button
             type="button"
             onClick={() => onScoreBall({ runs: 1, type: BALL_TYPES.NORMAL })}
-            className="h-12 sm:h-14 rounded-xl bg-[#162544] hover:bg-[#1e325c] border border-slate-600/70 text-cyan-300 font-mono text-2xl font-black flex items-center justify-center transition-all active:scale-95 shadow-md cursor-pointer hover:border-cyan-400/60"
+            className="h-14 sm:h-16 rounded-2xl bg-[#132038] hover:bg-[#1a2c4e] border border-slate-700/80 text-cyan-400 font-score text-3xl sm:text-4xl font-bold flex items-center justify-center transition-all active:scale-95 shadow-md cursor-pointer hover:border-cyan-400/60"
           >
             1
           </button>
@@ -134,7 +136,7 @@ export default function ScoringPad({
           <button
             type="button"
             onClick={() => onScoreBall({ runs: 2, type: BALL_TYPES.NORMAL })}
-            className="h-12 sm:h-14 rounded-xl bg-[#162544] hover:bg-[#1e325c] border border-slate-600/70 text-cyan-300 font-mono text-2xl font-black flex items-center justify-center transition-all active:scale-95 shadow-md cursor-pointer hover:border-cyan-400/60"
+            className="h-14 sm:h-16 rounded-2xl bg-[#132038] hover:bg-[#1a2c4e] border border-slate-700/80 text-cyan-400 font-score text-3xl sm:text-4xl font-bold flex items-center justify-center transition-all active:scale-95 shadow-md cursor-pointer hover:border-cyan-400/60"
           >
             2
           </button>
@@ -144,7 +146,7 @@ export default function ScoringPad({
           <button
             type="button"
             onClick={() => onScoreBall({ runs: 3, type: BALL_TYPES.NORMAL })}
-            className="h-12 sm:h-14 rounded-xl bg-[#162544] hover:bg-[#1e325c] border border-slate-600/70 text-cyan-300 font-mono text-2xl font-black flex items-center justify-center transition-all active:scale-95 shadow-md cursor-pointer hover:border-cyan-400/60"
+            className="h-14 sm:h-16 rounded-2xl bg-[#132038] hover:bg-[#1a2c4e] border border-slate-700/80 text-cyan-400 font-score text-3xl sm:text-4xl font-bold flex items-center justify-center transition-all active:scale-95 shadow-md cursor-pointer hover:border-cyan-400/60"
           >
             3
           </button>
@@ -153,7 +155,7 @@ export default function ScoringPad({
           <button
             type="button"
             onClick={() => onScoreBall({ runs: 4, type: BALL_TYPES.NORMAL, isFour: true })}
-            className="h-12 sm:h-14 rounded-xl bg-gradient-to-b from-amber-500/20 to-amber-600/30 hover:from-amber-500/35 hover:to-amber-600/45 border-2 border-amber-500 text-amber-300 font-mono text-2xl font-black flex items-center justify-center transition-all active:scale-95 shadow-md shadow-amber-950/40 cursor-pointer"
+            className="h-14 sm:h-16 rounded-2xl bg-[#241a0d] hover:bg-[#2e2111] border-2 border-amber-500 text-amber-400 font-score text-3xl sm:text-4xl font-bold flex items-center justify-center transition-all active:scale-95 shadow-md shadow-amber-950/40 cursor-pointer"
           >
             4
           </button>
@@ -162,42 +164,36 @@ export default function ScoringPad({
           <button
             type="button"
             onClick={() => onScoreBall({ runs: 6, type: BALL_TYPES.NORMAL, isSix: true })}
-            className="h-12 sm:h-14 rounded-xl bg-gradient-to-b from-purple-600/20 to-purple-700/30 hover:from-purple-600/35 hover:to-purple-700/45 border-2 border-purple-500 text-purple-200 font-mono text-2xl font-black flex items-center justify-center transition-all active:scale-95 shadow-md shadow-purple-950/40 cursor-pointer"
+            className="h-14 sm:h-16 rounded-2xl bg-[#241038] hover:bg-[#2f154a] border-2 border-purple-500 text-purple-200 font-score text-3xl sm:text-4xl font-bold flex items-center justify-center transition-all active:scale-95 shadow-md shadow-purple-950/40 cursor-pointer"
           >
             6
           </button>
         </div>
       </div>
 
-      {/* Extras Grid (Wide, No Ball, Leg Bye, Bye) */}
-      <div className="grid grid-cols-4 gap-1.5">
+      {/* Extras Grid (Wide Ball, No Ball, Leg Bye) */}
+      <div className="grid grid-cols-3 gap-2">
         <button
           type="button"
-          onClick={() => setExtraModal('WD')}
-          className="py-2.5 rounded-xl bg-blue-950/60 hover:bg-blue-900/70 border border-blue-500/50 text-blue-300 font-bold text-xs transition-all active:scale-95 cursor-pointer flex items-center justify-center shadow-sm"
+          onClick={() => onScoreBall({ runs: 1, type: BALL_TYPES.WIDE, batsmanRuns: 0 })}
+          className="h-11 sm:h-12 rounded-xl bg-[#132038] hover:bg-[#1a2c4e] border border-slate-700/80 text-cyan-300 font-bold text-xs sm:text-sm transition-all active:scale-95 cursor-pointer flex items-center justify-center shadow-sm"
+          title="Wide Ball: Instant +1 extra run"
         >
-          +WD (Wide)
+          Wide Ball
         </button>
         <button
           type="button"
-          onClick={() => setExtraModal('NB')}
-          className="py-2.5 rounded-xl bg-blue-950/60 hover:bg-blue-900/70 border border-blue-500/50 text-blue-300 font-bold text-xs transition-all active:scale-95 cursor-pointer flex items-center justify-center shadow-sm"
+          onClick={() => { setExtraRuns(0); setExtraModal('NB'); }}
+          className="h-11 sm:h-12 rounded-xl bg-[#132038] hover:bg-[#1a2c4e] border border-slate-700/80 text-cyan-300 font-bold text-xs sm:text-sm transition-all active:scale-95 cursor-pointer flex items-center justify-center shadow-sm"
         >
-          +NB (No Ball)
+          No Ball
         </button>
         <button
           type="button"
-          onClick={() => setExtraModal('LB')}
-          className="py-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 border border-slate-600/60 text-slate-300 font-bold text-xs transition-all active:scale-95 cursor-pointer flex items-center justify-center shadow-sm"
+          onClick={() => { setExtraRuns(1); setExtraModal('LB'); }}
+          className="h-11 sm:h-12 rounded-xl bg-[#132038] hover:bg-[#1a2c4e] border border-slate-700/80 text-slate-300 font-bold text-xs sm:text-sm transition-all active:scale-95 cursor-pointer flex items-center justify-center shadow-sm"
         >
           Leg Bye
-        </button>
-        <button
-          type="button"
-          onClick={() => setExtraModal('BYE')}
-          className="py-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 border border-slate-600/60 text-slate-300 font-bold text-xs transition-all active:scale-95 cursor-pointer flex items-center justify-center shadow-sm"
-        >
-          Bye
         </button>
       </div>
 
@@ -333,19 +329,13 @@ export default function ScoringPad({
               <span className="text-cyan-400 font-bold">Extra:</span>
               {extraModal === 'WD' ? 'Wide Ball' : extraModal === 'NB' ? 'No Ball' : extraModal === 'BYE' ? 'Bye' : 'Leg Bye'}
             </h3>
-            <p className="text-xs text-slate-400 mb-3.5">
-              {(extraModal === 'WD' || extraModal === 'NB')
-                ? 'Standard 1 penalty is automatic. Select additional runs completed by batsmen:'
-                : 'Select total runs completed:'}
-            </p>
-
-            <div className="grid grid-cols-5 gap-1.5 mb-5">
-              {[0, 1, 2, 3, 4].map((r) => (
+            <div className={`grid ${extraModal === 'NB' ? 'grid-cols-6' : 'grid-cols-4'} gap-1.5 mb-5`}>
+              {(extraModal === 'NB' ? [0, 1, 2, 3, 4, 6] : [1, 2, 3, 4]).map((r) => (
                 <button
                   key={r}
                   type="button"
                   onClick={() => setExtraRuns(r)}
-                  className={`h-11 rounded-xl font-mono text-base font-bold transition-all cursor-pointer ${
+                  className={`h-11 rounded-xl font-score text-base font-bold transition-all cursor-pointer ${
                     extraRuns === r
                       ? 'bg-cyan-500 text-slate-950 border-2 border-cyan-300 shadow-md shadow-cyan-950'
                       : 'bg-slate-800 text-white border border-slate-700 hover:border-cyan-500/50'
