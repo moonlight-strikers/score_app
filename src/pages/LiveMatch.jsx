@@ -41,12 +41,35 @@ export default function LiveMatch() {
   const [successMessage, setSuccessMessage] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
   const isScoringDebounceRef = useRef(false);
+  const isOperationBusyRef = useRef(false);
+  const lastLocalActionTimeRef = useRef(0);
   const [isUndoing, setIsUndoing] = useState(false);
   const [undoConfirmModal, setUndoConfirmModal] = useState({
     isOpen: false,
     title: '',
     message: ''
   });
+
+  // Serialized operation runner: guarantees that only one database-mutating scoring or undo action runs at a time
+  const runSerializedOperation = async (actionName, operationFn) => {
+    if (isOperationBusyRef.current) {
+      console.warn(`[UndoDebug] ${actionName} blocked: another database operation is actively processing`);
+      return false;
+    }
+    isOperationBusyRef.current = true;
+    setIsSaving(true);
+    lastLocalActionTimeRef.current = Date.now();
+    console.log(`[UndoDebug] Starting serialized operation: ${actionName}`);
+    try {
+      await operationFn();
+      return true;
+    } finally {
+      lastLocalActionTimeRef.current = Date.now();
+      isOperationBusyRef.current = false;
+      setIsSaving(false);
+      console.log(`[UndoDebug] Finished serialized operation: ${actionName}`);
+    }
+  };
 
   // Match management actions (Hold, Cancel, Delete)
   const [showActionsModal, setShowActionsModal] = useState(false);
@@ -287,30 +310,43 @@ export default function LiveMatch() {
           'postgres_changes',
           { event: '*', schema: 'public', table: 'matches', filter: `id=eq.${matchId}` },
           (payload) => {
-            if (isMounted && payload.new) {
-              setMatchData((prev) => {
-                if (!prev) return payload.new;
-                return { ...prev, ...payload.new };
-              });
+            if (!isMounted || !payload.new) return;
+            // Ignore if local operation is currently processing or finished within last 2 seconds
+            if (isOperationBusyRef.current || (Date.now() - lastLocalActionTimeRef.current < 2000)) {
+              console.log('[UndoDebug] Realtime: Ignored matches echo from local write');
+              return;
             }
+            console.log('[UndoDebug] Realtime: Applying external matches update');
+            setMatchData((prev) => {
+              if (!prev) return payload.new;
+              return { ...prev, ...payload.new };
+            });
           }
         )
         .on(
           'postgres_changes',
           { event: '*', schema: 'public', table: 'ball_by_ball', filter: `match_id=eq.${matchId}` },
-          () => {
-            if (isMounted) {
-              loadMatchAndBalls(true);
+          (payload) => {
+            if (!isMounted) return;
+            if (isOperationBusyRef.current || (Date.now() - lastLocalActionTimeRef.current < 2000)) {
+              console.log('[UndoDebug] Realtime: Ignored ball_by_ball echo from local write:', payload.eventType);
+              return;
             }
+            console.log('[UndoDebug] Realtime: External ball_by_ball change detected, syncing match and balls');
+            loadMatchAndBalls(true);
           }
         )
         .on(
           'postgres_changes',
           { event: '*', schema: 'public', table: 'innings', filter: `match_id=eq.${matchId}` },
           () => {
-            if (isMounted) {
-              loadMatchAndBalls(true);
+            if (!isMounted) return;
+            if (isOperationBusyRef.current || (Date.now() - lastLocalActionTimeRef.current < 2000)) {
+              console.log('[UndoDebug] Realtime: Ignored innings echo from local write');
+              return;
             }
+            console.log('[UndoDebug] Realtime: External innings change detected, syncing match and balls');
+            loadMatchAndBalls(true);
           }
         )
         .subscribe();
@@ -371,7 +407,7 @@ export default function LiveMatch() {
   const currentDeliveriesCount = (matchData.total_deliveries ?? 0) > 0
     ? matchData.total_deliveries
     : (matchData.recent_balls?.length ?? 0);
-  const canPerformUndo = currentDeliveriesCount > 0 || historyStack.length > 0 || currentLegalBalls > 0;
+  const canPerformUndo = (currentDeliveriesCount > 0 || historyStack.length > 0 || currentLegalBalls > 0) && !isUndoing && !isSaving && !isOperationBusyRef.current;
 
   // Save current state for Undo
   const pushHistory = () => {
@@ -379,6 +415,10 @@ export default function LiveMatch() {
   };
 
   const handleScoreBall = async ({ runs, type, batsmanRuns = 0, isFour = false, isSix = false }) => {
+    if (isOperationBusyRef.current || isUndoing || isSaving) {
+      console.warn('[ScoringDebug] Scoring blocked: another operation is in flight');
+      return;
+    }
     if (isScoringDebounceRef.current) return;
     isScoringDebounceRef.current = true;
     setTimeout(() => {
@@ -645,8 +685,8 @@ export default function LiveMatch() {
       setShowBowlerModal(true);
     }
 
-    // Synchronize to Supabase ball_by_ball, innings, and matches tables asynchronously in background
-    (async () => {
+    // Synchronize to Supabase ball_by_ball, innings, and matches tables via serialized mutex
+    runSerializedOperation(`ScoreBall(${ballLabel})`, async () => {
       try {
         await scoringService.recordBall(matchData.id, ballRecord);
       } catch (err) {
@@ -654,14 +694,18 @@ export default function LiveMatch() {
       }
 
       if (currentInningsId) {
-        inningsService.updateInnings(currentInningsId, {
-          match_id: matchData.id,
-          total_runs: newTotalRuns,
-          wickets: currentWickets,
-          overs_completed: Math.floor(newLegalBalls / 6),
-          balls_completed: newLegalBalls,
-          innings_status: 'live'
-        }).catch(err => console.warn('Innings update sync note:', err));
+        try {
+          await inningsService.updateInnings(currentInningsId, {
+            match_id: matchData.id,
+            total_runs: newTotalRuns,
+            wickets: currentWickets,
+            overs_completed: Math.floor(newLegalBalls / 6),
+            balls_completed: newLegalBalls,
+            innings_status: 'live'
+          });
+        } catch (err) {
+          console.warn('Innings update sync note:', err);
+        }
       }
 
       try {
@@ -669,12 +713,11 @@ export default function LiveMatch() {
       } catch (err) {
         console.warn('Match summary sync note:', err);
       }
-    })();
+    });
   };
 
   const handleWicket = async ({ wicketType, isStriker, newBatter, fielder }) => {
-    if (isSaving) return;
-    setIsSaving(true);
+    if (isOperationBusyRef.current || isSaving || isUndoing) return;
     setErrorMessage(null);
 
     const newWickets = currentWickets + 1;
@@ -907,8 +950,8 @@ export default function LiveMatch() {
       setShowBowlerModal(true);
     }
 
-    // Synchronize to Supabase ball_by_ball, innings, and matches tables asynchronously in background
-    (async () => {
+    // Synchronize to Supabase ball_by_ball, innings, and matches tables via serialized mutex
+    runSerializedOperation('Wicket', async () => {
       try {
         await scoringService.recordBall(matchData.id, ballRecord);
       } catch (err) {
@@ -916,14 +959,18 @@ export default function LiveMatch() {
       }
 
       if (currentInningsId) {
-        inningsService.updateInnings(currentInningsId, {
-          match_id: matchData.id,
-          total_runs: currentRuns,
-          wickets: newWickets,
-          overs_completed: Math.floor(newLegalBalls / 6),
-          balls_completed: newLegalBalls,
-          innings_status: 'live'
-        }).catch(err => console.warn('Innings update sync note:', err));
+        try {
+          await inningsService.updateInnings(currentInningsId, {
+            match_id: matchData.id,
+            total_runs: currentRuns,
+            wickets: newWickets,
+            overs_completed: Math.floor(newLegalBalls / 6),
+            balls_completed: newLegalBalls,
+            innings_status: 'live'
+          });
+        } catch (err) {
+          console.warn('Innings update sync note:', err);
+        }
       }
 
       try {
@@ -931,11 +978,16 @@ export default function LiveMatch() {
       } catch (err) {
         console.warn('Match summary sync note:', err);
       }
-    })();
+    });
   };
 
   const handleUndo = async () => {
-    if (isSaving || isUndoing) return;
+    if (isOperationBusyRef.current || isSaving || isUndoing) {
+      console.warn('[UndoDebug] handleUndo ignored: database operation actively processing');
+      return;
+    }
+
+    console.log('[UndoDebug] Undo button clicked for match:', matchData.id, 'innings:', matchData.current_innings || 1);
 
     // Check if the last delivery was a wicket or completed the match
     const isWicketLast = matchData.recent_balls?.length > 0 && matchData.recent_balls[matchData.recent_balls.length - 1] === 'W';
@@ -945,9 +997,7 @@ export default function LiveMatch() {
       setUndoConfirmModal({
         isOpen: true,
         title: isMatchCompleted ? 'Undo Match-Ending Delivery?' : 'Undo Wicket Delivery?',
-        message: isMatchCompleted
-          ? 'The last delivery completed the match. Undoing this delivery will reopen the match fixture as live and recalculate all statistics. Do you wish to continue?'
-          : 'The last delivery was recorded as a wicket. Undoing this delivery will restore the dismissed batter to the crease and decrement the team wicket count. Do you wish to continue?'
+        message: ''
       });
       return;
     }
@@ -956,9 +1006,14 @@ export default function LiveMatch() {
   };
 
   const executeUndo = async () => {
-    if (isSaving || isUndoing) return;
+    if (isOperationBusyRef.current || isUndoing) {
+      console.warn('[UndoDebug] executeUndo blocked: operation in progress');
+      return;
+    }
+    isOperationBusyRef.current = true;
     setIsUndoing(true);
     setIsSaving(true);
+    lastLocalActionTimeRef.current = Date.now();
     setErrorMessage(null);
     setSuccessMessage(null);
     setUndoConfirmModal({ isOpen: false, title: '', message: '' });
@@ -967,6 +1022,8 @@ export default function LiveMatch() {
       const currentInn = matchData.current_innings || 1;
       const isFirst = currentInn === 1;
 
+      console.log(`[UndoDebug] Database operation started: reversing latest delivery for match ${matchData.id}, innings ${currentInn}`);
+
       // 1. Delete delivery from Supabase / localStorage scoped to current innings
       const undoResult = await scoringService.undoBall(matchData.id, currentInn);
       if (!undoResult?.success) {
@@ -974,6 +1031,7 @@ export default function LiveMatch() {
       }
 
       const removedBall = undoResult.removed;
+      console.log('[UndoDebug] Latest delivery identified and reversed:', removedBall?.id, 'seq:', removedBall?.delivery_sequence);
 
       // 2. Fetch authoritative remaining deliveries
       const remainingBalls = await scoringService.getInningsBalls(matchData.id, currentInn);
@@ -1135,14 +1193,18 @@ export default function LiveMatch() {
       // 9. Synchronize to database
       await matchService.updateMatch(matchData.id, revertedState);
 
+      console.log('[UndoDebug] Frontend state updated and database confirmed after undo');
       setSuccessMessage('Delivery undone successfully');
       setTimeout(() => setSuccessMessage(null), 3000);
     } catch (err) {
-      console.error('Undo error:', err);
+      console.error('[UndoDebug] Database operation failed during undo:', err);
       setErrorMessage(`Failed to undo delivery: ${err.message}`);
     } finally {
+      lastLocalActionTimeRef.current = Date.now();
+      isOperationBusyRef.current = false;
       setIsUndoing(false);
       setIsSaving(false);
+      console.log('[UndoDebug] Undo operation completed; buttons re-enabled');
     }
   };
 
@@ -1616,7 +1678,7 @@ export default function LiveMatch() {
                 <button
                   type="button"
                   onClick={handleUndo}
-                  disabled={isUndoing || isSaving}
+                  disabled={isUndoing || isSaving || isOperationBusyRef.current}
                   className="py-2 px-3.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-600 text-xs font-bold cursor-pointer flex items-center gap-1.5 shadow-xs disabled:opacity-50"
                   title="Reverse match-concluding delivery"
                 >
@@ -2088,12 +2150,14 @@ export default function LiveMatch() {
             <div className="w-10 h-10 rounded-full bg-cyan-500/20 border border-cyan-400 flex items-center justify-center mx-auto mb-3">
               <Undo2 className="w-5 h-5 text-cyan-400" />
             </div>
-            <h3 className="text-base font-black text-white mb-1.5">
+            <h3 className="text-base font-black text-white mb-4">
               {undoConfirmModal.title}
             </h3>
-            <p className="text-xs text-slate-300 leading-relaxed mb-4">
-              {undoConfirmModal.message}
-            </p>
+            {undoConfirmModal.message && (
+              <p className="text-xs text-slate-300 leading-relaxed mb-4">
+                {undoConfirmModal.message}
+              </p>
+            )}
             <div className="flex items-center gap-2">
               <button
                 type="button"

@@ -111,30 +111,29 @@ export const scoringService = {
    */
   async undoBall(matchId, inningsNumber = null, expectedBallId = null) {
     let removedBall = null;
+    const innNum = inningsNumber ? Number(inningsNumber) : null;
 
     if (isSupabaseConfigured) {
       // 1. Try atomic PostgreSQL RPC if deployed
       try {
         const { data: rpcData, error: rpcErr } = await supabase.rpc('undo_latest_delivery', {
           p_match_id: matchId,
-          p_innings_number: inningsNumber ? Number(inningsNumber) : null,
+          p_innings_number: innNum,
           p_expected_ball_id: expectedBallId ? String(expectedBallId) : null
         });
 
         if (!rpcErr && rpcData) {
           if (rpcData.success) {
             removedBall = rpcData.removed_ball;
+            console.log('[UndoDebug] Successfully reversed delivery via RPC:', removedBall?.id);
           } else {
-            throw new Error(rpcData.error || 'Failed to undo delivery via RPC');
+            console.warn('[UndoDebug] RPC returned failure:', rpcData.error);
           }
-        } else if (rpcErr && rpcErr.code !== 'PGRST202') {
-          console.error('Supabase undoBall RPC error:', rpcErr);
-          throw new Error(rpcErr.message || 'RPC undo delivery failed');
+        } else if (rpcErr) {
+          console.warn('[UndoDebug] RPC unavailable or error, falling back to direct delete:', rpcErr.message || rpcErr);
         }
       } catch (err) {
-        if (err.message && !err.message.includes('schema cache') && !err.message.includes('PGRST202')) {
-          throw err;
-        }
+        console.warn('[UndoDebug] RPC call threw exception, falling back to direct delete:', err.message);
       }
 
       // 2. Safe client-side fallback if RPC is not available in database
@@ -144,22 +143,24 @@ export const scoringService = {
           .select('*')
           .eq('match_id', matchId);
 
-        if (inningsNumber) {
-          query = query.eq('innings_number', inningsNumber);
+        if (innNum !== null) {
+          query = query.eq('innings_number', innNum);
         }
 
         const { data: latestBall, error: findError } = await query
           .order('delivery_sequence', { ascending: false })
           .order('created_at', { ascending: false })
+          .order('id', { ascending: false })
           .limit(1)
           .maybeSingle();
 
         if (findError) {
-          console.error('Supabase undoBall find error:', findError);
+          console.error('[UndoDebug] Supabase undoBall find error:', findError);
           throw new Error(findError.message || 'Failed to locate last delivery for undo');
         }
 
         if (latestBall) {
+          console.log('[UndoDebug] Identified latest delivery to remove:', latestBall.id, 'seq:', latestBall.delivery_sequence, 'type:', latestBall.type);
           if (expectedBallId && String(latestBall.id) !== String(expectedBallId)) {
             throw new Error('Concurrency conflict: The latest delivery was already modified on another device.');
           }
@@ -170,10 +171,13 @@ export const scoringService = {
             .eq('id', latestBall.id);
 
           if (delError) {
-            console.error('Supabase undoBall delete error:', delError);
+            console.error('[UndoDebug] Supabase undoBall delete error:', delError);
             throw new Error(delError.message || 'Failed to remove delivery from database');
           }
           removedBall = latestBall;
+          console.log('[UndoDebug] Successfully deleted ball record from Supabase:', latestBall.id);
+        } else {
+          console.warn('[UndoDebug] No deliveries found in Supabase for match:', matchId, 'innings:', innNum);
         }
       }
     }
@@ -226,10 +230,12 @@ export const scoringService = {
           .from('ball_by_ball')
           .select('*')
           .eq('match_id', matchId)
-          .order('delivery_sequence', { ascending: true });
+          .order('delivery_sequence', { ascending: true })
+          .order('created_at', { ascending: true })
+          .order('id', { ascending: true });
 
-        if (inningsNumber) {
-          query = query.eq('innings_number', inningsNumber);
+        if (inningsNumber !== null && inningsNumber !== undefined) {
+          query = query.eq('innings_number', Number(inningsNumber));
         }
 
         const { data, error } = await query;

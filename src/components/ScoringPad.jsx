@@ -10,6 +10,7 @@ export default function ScoringPad({
   onChangeBowler,
   onEndInnings,
   canUndo = false,
+  isUndoing = false,
   strikerName = 'Striker',
   nonStrikerName = 'Non-Striker',
   bowlerName = 'Bowler'
@@ -211,11 +212,16 @@ export default function ScoringPad({
         <button
           type="button"
           onClick={onUndo}
-          disabled={!canUndo}
+          disabled={!canUndo || isUndoing}
           className="py-3 rounded-2xl bg-slate-800 hover:bg-slate-700 border border-slate-600/70 text-slate-200 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-md"
+          title={isUndoing ? 'Reversing delivery...' : 'Undo last delivery'}
         >
-          <Undo2 className="w-3.5 h-3.5 text-cyan-400" />
-          <span>Undo</span>
+          {isUndoing ? (
+            <RotateCw className="w-3.5 h-3.5 text-cyan-400 animate-spin" />
+          ) : (
+            <Undo2 className="w-3.5 h-3.5 text-cyan-400" />
+          )}
+          <span>{isUndoing ? 'Undoing...' : 'Undo'}</span>
         </button>
       </div>
 

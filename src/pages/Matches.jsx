@@ -4,6 +4,7 @@ import { matchService } from '../services/matchService';
 import { supabase } from '../services/supabase';
 import { Trophy, Plus, Calendar, ChevronRight, Zap, Share2, Trash2 } from 'lucide-react';
 import { shareMatchResult, isTwoDaysOld, formatMatchDate, formatMatchTime } from '../utils/shareMatch';
+import { getMatchDisplayTeams } from '../utils/matchDisplay';
 
 export default function Matches() {
   const [filter, setFilter] = useState('all'); // 'all' | 'live' | 'completed' | 'scheduled'
@@ -135,6 +136,7 @@ export default function Matches() {
             const isCompleted = m.status === 'completed';
             const isOld = isTwoDaysOld(m.created_at);
             const winnerText = m.result || (m.winner_team ? `${m.winner_team} Won!` : null);
+            const { leftTeam, rightTeam } = getMatchDisplayTeams(m);
 
             return (
               <div
@@ -192,24 +194,24 @@ export default function Matches() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-2.5 min-w-0">
                   <div className="flex items-center justify-between p-2 rounded-xl bg-ms-bg-input/60 border border-ms-border min-w-0">
                     <span className="font-bold text-sm sm:text-base text-slate-900 dark:text-white truncate flex-1 min-w-0 pr-1 tracking-tight">
-                      {m.team_a_name}
+                      {leftTeam.name}
                     </span>
                     <span className="font-score text-base sm:text-lg font-bold text-cyan-600 dark:text-cyan-400 flex-shrink-0 tabular-nums">
-                      {m.team_a_score ?? 0}/{m.team_a_wickets ?? 0}
+                      {leftTeam.score ?? 0}/{leftTeam.wickets ?? 0}
                       <span className="text-xs sm:text-sm text-slate-500 dark:text-slate-300 ml-1 font-semibold tabular-nums font-score">
-                        ({m.team_a_overs || '0.0'})
+                        ({leftTeam.overs || '0.0'})
                       </span>
                     </span>
                   </div>
 
                   <div className="flex items-center justify-between p-2 rounded-xl bg-ms-bg-input/60 border border-ms-border min-w-0">
                     <span className="font-bold text-sm sm:text-base text-slate-900 dark:text-white truncate flex-1 min-w-0 pr-1 tracking-tight">
-                      {m.team_b_name}
+                      {rightTeam.name}
                     </span>
                     <span className="font-score text-base sm:text-lg font-bold text-slate-900 dark:text-white flex-shrink-0 tabular-nums">
-                      {m.team_b_score ?? 0}/{m.team_b_wickets ?? 0}
+                      {rightTeam.score ?? 0}/{rightTeam.wickets ?? 0}
                       <span className="text-xs sm:text-sm text-slate-500 dark:text-slate-300 ml-1 font-semibold tabular-nums font-score">
-                        ({m.team_b_overs || '0.0'})
+                        ({rightTeam.overs || '0.0'})
                       </span>
                     </span>
                   </div>

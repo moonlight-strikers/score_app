@@ -12,6 +12,7 @@ import {
 import { matchService } from '../services/matchService';
 import { supabase } from '../services/supabase';
 import { shareMatchResult, isTwoDaysOld, formatMatchDate, formatMatchTime } from '../utils/shareMatch';
+import { getMatchDisplayTeams } from '../utils/matchDisplay';
 
 export default function Home() {
   const [recentMatches, setRecentMatches] = useState([]);
@@ -116,7 +117,10 @@ export default function Home() {
               </span>
               <Radio className="w-4 h-4 text-red-500 animate-pulse" />
             </div>
-            <div className="flex items-center justify-center py-2">
+            <div className="flex flex-col items-center justify-center py-2 text-center">
+              <p className="text-xs sm:text-sm font-semibold text-slate-400 dark:text-slate-300 mb-2.5">
+                No live match
+              </p>
               <Link
                 to="/matches/create"
                 className="ms-btn ms-btn-primary text-xs sm:text-sm py-2 px-6 rounded-xl shadow-md flex items-center justify-center gap-2 font-bold w-full max-w-[200px] cursor-pointer active:scale-95 transition-all"
@@ -272,6 +276,7 @@ export default function Home() {
               const isOld = isTwoDaysOld(match.created_at);
               const isCompleted = match.status === 'completed';
               const winnerText = match.result || (match.winner_team ? `${match.winner_team} Won!` : null);
+              const { leftTeam, rightTeam } = getMatchDisplayTeams(match);
 
               return (
                 <div
@@ -307,21 +312,21 @@ export default function Home() {
 
                     <div className="flex items-center justify-between gap-1.5 min-w-0 py-0.5">
                       <div className="flex-1 min-w-0 pr-1">
-                        <div className="text-sm sm:text-base font-bold text-slate-900 dark:text-white truncate tracking-tight">{match.team_a_name}</div>
+                        <div className="text-sm sm:text-base font-bold text-slate-900 dark:text-white truncate tracking-tight">{leftTeam.name}</div>
                         <div className="text-base sm:text-lg font-score font-bold text-cyan-600 dark:text-cyan-400 mt-0.5 truncate tabular-nums">
-                          {match.team_a_score ?? 0}/{match.team_a_wickets ?? 0}
+                          {leftTeam.score ?? 0}/{leftTeam.wickets ?? 0}
                           <span className="text-xs text-slate-500 dark:text-slate-300 ml-1 font-semibold tabular-nums font-score">
-                            ({match.team_a_overs || '0.0'})
+                            ({leftTeam.overs || '0.0'})
                           </span>
                         </div>
                       </div>
                       <div className="text-xs text-slate-400 dark:text-slate-400 font-bold flex-shrink-0 px-1 font-sans">vs</div>
                       <div className="flex-1 min-w-0 pl-1 text-right">
-                        <div className="text-sm sm:text-base font-bold text-slate-900 dark:text-white truncate tracking-tight">{match.team_b_name}</div>
+                        <div className="text-sm sm:text-base font-bold text-slate-900 dark:text-white truncate tracking-tight">{rightTeam.name}</div>
                         <div className="text-base sm:text-lg font-score font-bold text-slate-900 dark:text-white mt-0.5 truncate tabular-nums">
-                          {match.team_b_score ?? 0}/{match.team_b_wickets ?? 0}
+                          {rightTeam.score ?? 0}/{rightTeam.wickets ?? 0}
                           <span className="text-xs text-slate-500 dark:text-slate-300 ml-1 font-semibold tabular-nums font-score">
-                            ({match.team_b_overs || '0.0'})
+                            ({rightTeam.overs || '0.0'})
                           </span>
                         </div>
                       </div>
