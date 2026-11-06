@@ -1,5 +1,6 @@
 import React from 'react';
 import { calculateRunRate, oversToBalls, resolveBatterStatus } from '../utils/cricketRules';
+import PlayerAvatar from './PlayerAvatar';
 
 export default function Scorecard({ match, innings = [] }) {
   return (
@@ -121,11 +122,12 @@ export default function Scorecard({ match, innings = [] }) {
                       return (
                         <tr key={i} className="hover:bg-ms-bg-elevated/40 transition-colors">
                           <td className="py-2.5">
-                            <div className="font-semibold text-ms-text-primary flex items-center gap-1.5 uppercase">
-                              <span>{b.name}</span>
+                            <div className="font-semibold text-ms-text-primary flex items-center gap-2 uppercase">
+                              <PlayerAvatar player={b} size="xs" />
+                              <span className="truncate">{b.name}</span>
                               {isNotOut && <span className="text-xs text-ms-cyan font-bold font-sans">*</span>}
                             </div>
-                            <div className="text-[11px] text-ms-text-muted truncate max-w-[180px]">
+                            <div className="text-[11px] text-ms-text-muted truncate max-w-[180px] ml-8">
                               {label}
                             </div>
                           </td>
@@ -166,7 +168,12 @@ export default function Scorecard({ match, innings = [] }) {
                   <tbody>
                     {(inn.bowlers || []).map((bw, i) => (
                       <tr key={i} className="hover:bg-ms-bg-elevated/40 transition-colors">
-                        <td className="py-2.5 font-semibold text-ms-text-primary uppercase">{bw.name}</td>
+                        <td className="py-2.5 font-semibold text-ms-text-primary uppercase">
+                          <div className="flex items-center gap-2">
+                            <PlayerAvatar player={bw} size="xs" />
+                            <span className="truncate">{bw.name}</span>
+                          </div>
+                        </td>
                         <td className="text-right font-score font-semibold text-ms-text-secondary text-sm tabular-nums">{bw.overs}</td>
                         <td className="text-right font-score tabular-nums text-ms-text-muted text-sm">{bw.maidens || 0}</td>
                         <td className="text-right font-score font-semibold text-ms-text-primary text-sm tabular-nums">{bw.runs}</td>

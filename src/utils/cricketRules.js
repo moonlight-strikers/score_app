@@ -10,10 +10,8 @@ export const BALL_TYPES = {
 export const WICKET_TYPES = {
   BOWLED: 'Bowled',
   CAUGHT: 'Caught',
-  LBW: 'LBW',
   RUN_OUT: 'Run Out',
   STUMPED: 'Stumped',
-  HIT_WICKET: 'Hit Wicket',
   RETIRED: 'Retired Hurt'
 };
 

@@ -582,13 +582,13 @@ export default function Toss() {
           <button
             type="button"
             onClick={() => setSoundEnabled((prev) => !prev)}
-            className="p-1.5 rounded-lg border border-ms-border bg-ms-bg-card hover:bg-ms-bg-elevated text-ms-text-secondary transition-all cursor-pointer"
+            className="p-2 rounded-full border border-ms-border bg-ms-bg-card hover:bg-ms-bg-elevated text-slate-800 dark:text-white transition-all cursor-pointer"
             title={soundEnabled ? 'Mute Sound' : 'Enable Sound'}
           >
             {soundEnabled ? (
-              <Volume2 className="w-4 h-4 text-ms-cyan" />
+              <Volume2 className="w-4 h-4 text-slate-900 dark:text-white" />
             ) : (
-              <VolumeX className="w-4 h-4 text-ms-text-muted" />
+              <VolumeX className="w-4 h-4 text-slate-500 dark:text-slate-400" />
             )}
           </button>
 
@@ -597,10 +597,10 @@ export default function Toss() {
               type="button"
               onClick={handleReset}
               disabled={isFlipping}
-              className="ms-btn ms-btn-outline ms-btn-sm text-xs gap-1.5 flex-shrink-0"
+              className="ms-btn ms-btn-outline ms-btn-sm"
               title="Reset Coin"
             >
-              <RefreshCw className="w-3.5 h-3.5" />
+              <RefreshCw />
               <span className="hidden sm:inline">Reset</span>
             </button>
           )}
@@ -679,11 +679,11 @@ export default function Toss() {
               type="button"
               onClick={handleFlip}
               disabled={isFlipping}
-              className={`ms-btn ms-btn-primary px-10 py-3.5 text-base font-bold shadow-xl flex items-center gap-2.5 rounded-xl transition-all cursor-pointer ${
+              className={`ms-btn ms-btn-primary ms-btn-lg px-10 text-base font-bold shadow-xl flex items-center gap-2.5 transition-all cursor-pointer ${
                 isFlipping ? 'opacity-80 cursor-not-allowed scale-95' : 'hover:scale-105 active:scale-95 shadow-cyan-500/20'
               }`}
             >
-              <RotateCw className={`w-5 h-5 ${isFlipping ? 'animate-spin' : ''}`} />
+              <RotateCw className={isFlipping ? 'animate-spin' : ''} />
               <span>{isFlipping ? 'Flipping Coin...' : result ? 'Flip Again' : 'Flip Coin'}</span>
             </button>
           </div>

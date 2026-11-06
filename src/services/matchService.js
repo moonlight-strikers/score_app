@@ -51,8 +51,9 @@ function sanitizeMatch(matchData) {
 }
 
 function getLocalMatches() {
+  if (typeof window === 'undefined' || !window.localStorage) return [];
   try {
-    const raw = localStorage.getItem(LOCAL_STORAGE_KEY);
+    const raw = window.localStorage.getItem(LOCAL_STORAGE_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     const cleaned = Array.isArray(parsed)
@@ -68,8 +69,9 @@ function getLocalMatches() {
 }
 
 function saveLocalMatches(matches) {
+  if (typeof window === 'undefined' || !window.localStorage) return;
   try {
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(matches));
+    window.localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(matches));
   } catch (err) {
     console.warn('Failed to save to localStorage', err);
   }
@@ -247,11 +249,25 @@ export const matchService = {
     return updatedMatch || updates;
   },
 
-  async deleteMatch(matchId) {
+  async deleteMatch(matchId, adminToken = null) {
     const local = getLocalMatches();
     saveLocalMatches(local.filter((m) => m.id !== matchId));
 
     if (isSupabaseConfigured) {
+      if (adminToken) {
+        // Use server-authorized admin RPC
+        const { error: rpcErr } = await supabase.rpc('admin_delete_match', {
+          p_token: adminToken,
+          p_match_id: matchId,
+        });
+
+        if (!rpcErr) {
+          return true;
+        }
+
+        console.warn('admin_delete_match RPC note, retrying direct cascade delete:', rpcErr);
+      }
+
       // 1. Cascade delete all balls
       await supabase.from('ball_by_ball').delete().eq('match_id', matchId);
 
@@ -269,6 +285,9 @@ export const matchService = {
         .eq('id', matchId);
 
       if (error) {
+        if (error.code === '42501') {
+          throw new Error('Unauthorized: Admin authorization is required to delete matches.');
+        }
         console.error('Supabase deleteMatch error:', error);
         throw new Error(error.message || 'Failed to delete match from server');
       }

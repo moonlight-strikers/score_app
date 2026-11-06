@@ -23,5 +23,13 @@ export const isSupabaseConfigured = Boolean(
 const supabaseUrl = isSupabaseConfigured ? rawUrl : defaultUrl;
 const supabaseAnonKey = isSupabaseConfigured ? rawKey : defaultKey;
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const APP_VERSION = '2.0.0';
+
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  global: {
+    headers: {
+      'x-app-version': APP_VERSION
+    }
+  }
+});
 

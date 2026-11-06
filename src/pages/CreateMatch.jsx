@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { matchService } from '../services/matchService';
 import { inningsService } from '../services/inningsService';
 import Stepper, { Step } from '../components/Stepper';
+import PlayerSelector from '../components/PlayerSelector';
 import { useTheme } from '../contexts/ThemeContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import {
@@ -38,8 +39,11 @@ export default function CreateMatch() {
     toss_winner: 'Team A',
     toss_decision: 'bat',
     striker_name: '',
+    striker_id: '',
     non_striker_name: '',
-    opening_bowler_name: ''
+    non_striker_id: '',
+    opening_bowler_name: '',
+    opening_bowler_id: ''
   });
 
   const handleChange = (e) => {
@@ -106,9 +110,36 @@ export default function CreateMatch() {
     }
 
     if (stepNumber === 3) {
-      const striker = (formData.striker_name || '').trim();
-      if (!striker) {
-        setError('Striker name is required.');
+      if (!formData.striker_id || !formData.striker_name) {
+        setError('Please search and select a registered player for Striker.');
+        return false;
+      }
+      if (!formData.non_striker_id || !formData.non_striker_name) {
+        setError('Please search and select a registered player for Non-Striker.');
+        return false;
+      }
+      if (!formData.opening_bowler_id || !formData.opening_bowler_name) {
+        setError('Please search and select a registered player for Opening Bowler.');
+        return false;
+      }
+
+      // Check duplicates using UUID (or player_id / normalized name)
+      const sId = formData.striker_uuid || formData.striker_id;
+      const nsId = formData.non_striker_uuid || formData.non_striker_id;
+      const bId = formData.opening_bowler_uuid || formData.opening_bowler_id;
+      const sName = (formData.striker_name || '').trim().toLowerCase();
+      const nsName = (formData.non_striker_name || '').trim().toLowerCase();
+      const bName = (formData.opening_bowler_name || '').trim().toLowerCase();
+
+      if (
+        sId === nsId ||
+        sId === bId ||
+        nsId === bId ||
+        sName === nsName ||
+        sName === bName ||
+        nsName === bName
+      ) {
+        setError('Each opening position must have a different player. Please select another player.');
         return false;
       }
       return true;
@@ -185,11 +216,41 @@ export default function CreateMatch() {
           wickets: 0,
           overs: '0.0',
           batters: i === 1 ? [
-            { name: (formData.striker_name?.trim() || 'Striker').toUpperCase(), runs: 0, balls: 0, fours: 0, sixes: 0, notOut: true },
-            { name: (formData.non_striker_name?.trim() || 'Non-Striker').toUpperCase(), runs: 0, balls: 0, fours: 0, sixes: 0, notOut: true }
+            {
+              id: formData.striker_uuid || '',
+              name: (formData.striker_name?.trim() || 'Striker').toUpperCase(),
+              player_id: formData.striker_id || '',
+              photo_url: formData.striker_photo || null,
+              runs: 0,
+              balls: 0,
+              fours: 0,
+              sixes: 0,
+              notOut: true
+            },
+            {
+              id: formData.non_striker_uuid || '',
+              name: (formData.non_striker_name?.trim() || 'Non-Striker').toUpperCase(),
+              player_id: formData.non_striker_id || '',
+              photo_url: formData.non_striker_photo || null,
+              runs: 0,
+              balls: 0,
+              fours: 0,
+              sixes: 0,
+              notOut: true
+            }
           ] : [],
           bowlers: i === 1 ? [
-            { name: (formData.opening_bowler_name?.trim() || 'Bowler').toUpperCase(), overs: '0.0', maidens: 0, runs: 0, wickets: 0, economy: '0.00' }
+            {
+              id: formData.opening_bowler_uuid || '',
+              name: (formData.opening_bowler_name?.trim() || 'Bowler').toUpperCase(),
+              player_id: formData.opening_bowler_id || '',
+              photo_url: formData.opening_bowler_photo || null,
+              overs: '0.0',
+              maidens: 0,
+              runs: 0,
+              wickets: 0,
+              economy: '0.00'
+            }
           ] : [],
           extras: { wides: 0, noballs: 0, byes: 0, legbyes: 0, total: 0 }
         });
@@ -214,7 +275,10 @@ export default function CreateMatch() {
         current_over_deliveries: [],
         recent_balls: [],
         striker: {
+          id: formData.striker_uuid || '',
           name: (formData.striker_name?.trim() || 'Striker').toUpperCase(),
+          player_id: formData.striker_id || '',
+          photo_url: formData.striker_photo || null,
           runs: 0,
           balls: 0,
           fours: 0,
@@ -222,7 +286,10 @@ export default function CreateMatch() {
           notOut: true
         },
         non_striker: {
+          id: formData.non_striker_uuid || '',
           name: (formData.non_striker_name?.trim() || 'Non-Striker').toUpperCase(),
+          player_id: formData.non_striker_id || '',
+          photo_url: formData.non_striker_photo || null,
           runs: 0,
           balls: 0,
           fours: 0,
@@ -230,7 +297,10 @@ export default function CreateMatch() {
           notOut: true
         },
         bowler: {
+          id: formData.opening_bowler_uuid || '',
           name: (formData.opening_bowler_name?.trim() || 'Bowler').toUpperCase(),
+          player_id: formData.opening_bowler_id || '',
+          photo_url: formData.opening_bowler_photo || null,
           overs: '0.0',
           maidens: 0,
           runs: 0,
@@ -291,7 +361,7 @@ export default function CreateMatch() {
           linear={true}
           showFooter={false}
           theme={theme}
-          accentColor={theme === 'dark' ? '#06b6d4' : '#000000'}
+          accentColor="#0782C6"
           className="w-full"
         >
           {/* ============================================================ */}
@@ -315,14 +385,14 @@ export default function CreateMatch() {
                       overs: 20,
                       max_overs_per_bowler: 4
                     }))}
-                    className={`py-2.5 px-2.5 rounded-xl border text-xs font-bold transition-all text-center flex items-center justify-center gap-1.5 cursor-pointer active:scale-[0.98] ${
+                    className={`py-2.5 px-3 rounded-full border text-xs sm:text-sm font-semibold transition-all text-center flex items-center justify-center gap-2 cursor-pointer active:scale-[0.98] ${
                       formData.match_type !== 'test'
-                        ? 'bg-cyan-500 text-slate-950 font-black border-cyan-400 shadow-sm shadow-cyan-950/40'
-                        : 'bg-ms-bg-input border-ms-border text-ms-text-secondary hover:text-ms-text-primary'
+                        ? 'ms-btn-primary font-bold'
+                        : 'ms-btn-elevated'
                     }`}
                   >
-                    <Zap className="w-3.5 h-3.5 text-black dark:text-white" />
-                    <span className="font-bold text-xs sm:text-sm">{t('createMatch.limitedOvers')}</span>
+                    <Zap className="w-4 h-4" />
+                    <span>{t('createMatch.limitedOvers')}</span>
                   </button>
 
                   <button
@@ -334,14 +404,14 @@ export default function CreateMatch() {
                       configured_innings: 4,
                       max_overs_per_bowler: 99
                     }))}
-                    className={`py-2.5 px-2.5 rounded-xl border text-xs font-bold transition-all text-center flex items-center justify-center gap-1.5 cursor-pointer active:scale-[0.98] ${
+                    className={`py-2.5 px-3 rounded-full border text-xs sm:text-sm font-semibold transition-all text-center flex items-center justify-center gap-2 cursor-pointer active:scale-[0.98] ${
                       formData.match_type === 'test'
-                        ? 'bg-cyan-500 text-slate-950 font-black border-cyan-400 shadow-sm shadow-cyan-950/40'
-                        : 'bg-ms-bg-input border-ms-border text-ms-text-secondary hover:text-ms-text-primary'
+                        ? 'ms-btn-primary font-bold'
+                        : 'ms-btn-elevated'
                     }`}
                   >
-                    <Shield className="w-3.5 h-3.5 text-black dark:text-white" />
-                    <span className="font-bold text-xs sm:text-sm">{t('createMatch.testMatch')}</span>
+                    <Shield className="w-4 h-4" />
+                    <span>{t('createMatch.testMatch')}</span>
                   </button>
                 </div>
               </div>
@@ -361,10 +431,10 @@ export default function CreateMatch() {
                           key={ov}
                           type="button"
                           onClick={() => handleOversPreset(ov)}
-                          className={`py-2 px-1 rounded-xl text-sm sm:text-base font-score font-bold tabular-nums leading-tight border transition-all cursor-pointer text-center truncate active:scale-[0.98] ${
+                          className={`h-11 rounded-full text-sm sm:text-base font-score font-bold tabular-nums leading-tight border transition-all cursor-pointer text-center truncate active:scale-[0.98] flex items-center justify-center ${
                             Number(formData.overs) === ov
-                              ? 'bg-cyan-500 text-slate-950 font-black border-cyan-400 shadow-sm shadow-cyan-950/40'
-                              : 'bg-ms-bg-input border-ms-border text-slate-900 dark:text-white hover:text-cyan-600 dark:hover:text-cyan-400 hover:border-ms-border-light'
+                              ? 'ms-btn-primary'
+                              : 'ms-btn-elevated'
                           }`}
                         >
                           {ov}
@@ -405,10 +475,10 @@ export default function CreateMatch() {
                           key={inn}
                           type="button"
                           onClick={() => setFormData((prev) => ({ ...prev, configured_innings: inn }))}
-                          className={`py-2 px-1 rounded-xl border text-xs sm:text-sm font-bold transition-all text-center cursor-pointer active:scale-[0.98] ${
+                          className={`h-11 rounded-full border text-xs sm:text-sm font-bold transition-all text-center cursor-pointer active:scale-[0.98] flex items-center justify-center ${
                             Number(formData.configured_innings) === inn
-                              ? 'bg-cyan-500 text-slate-950 font-black border-cyan-400 shadow-sm shadow-cyan-950/40'
-                              : 'bg-ms-bg-input border-ms-border text-slate-900 dark:text-white hover:text-cyan-600 dark:hover:text-cyan-400'
+                              ? 'ms-btn-primary'
+                              : 'ms-btn-elevated'
                           }`}
                         >
                           {inn} {t('common.innings')}
@@ -431,10 +501,10 @@ export default function CreateMatch() {
                             key={ov}
                             type="button"
                             onClick={() => handleOversPreset(ov)}
-                            className={`py-2 px-1 rounded-xl text-sm sm:text-base font-score font-bold tabular-nums leading-tight border transition-all cursor-pointer text-center truncate active:scale-[0.98] ${
+                            className={`h-11 rounded-full text-sm sm:text-base font-score font-bold tabular-nums leading-tight border transition-all cursor-pointer text-center truncate active:scale-[0.98] flex items-center justify-center ${
                               Number(formData.overs) === ov
-                                ? 'bg-cyan-500 text-slate-950 font-black border-cyan-400 shadow-sm shadow-cyan-950/40'
-                                : 'bg-ms-bg-input border-ms-border text-slate-900 dark:text-white hover:text-cyan-600 dark:hover:text-cyan-400 hover:border-ms-border-light'
+                                ? 'ms-btn-primary'
+                                : 'ms-btn-elevated'
                             }`}
                           >
                             {ov}
@@ -468,10 +538,10 @@ export default function CreateMatch() {
                 <button
                   type="button"
                   onClick={handleNext}
-                  className="ms-btn ms-btn-primary w-full py-3.5 sm:py-4 text-sm sm:text-base font-black shadow-lg shadow-cyan-900/30 flex items-center justify-center gap-2.5 cursor-pointer rounded-2xl active:scale-[0.98] transition-all tracking-wide"
+                  className="ms-btn ms-btn-primary w-full cursor-pointer"
                 >
                   <span>{t('createMatch.continueToTeams')}</span>
-                  <ArrowRight className="w-5 h-5 text-black dark:text-white" />
+                  <ArrowRight />
                 </button>
               </div>
             </div>
@@ -578,18 +648,18 @@ export default function CreateMatch() {
                 <button
                   type="button"
                   onClick={handleBack}
-                  className="ms-btn ms-btn-secondary py-3.5 sm:py-4 px-5 text-sm sm:text-base font-bold flex items-center justify-center gap-1.5 cursor-pointer rounded-2xl active:scale-[0.98] transition-all flex-none"
+                  className="ms-btn ms-btn-outline cursor-pointer flex-none"
                 >
-                  <ArrowLeft className="w-4 h-4" />
+                  <ArrowLeft />
                   <span>{t('common.back')}</span>
                 </button>
                 <button
                   type="button"
                   onClick={handleNext}
-                  className="ms-btn ms-btn-primary flex-1 py-3.5 sm:py-4 text-sm sm:text-base font-black shadow-lg shadow-cyan-900/30 flex items-center justify-center gap-2.5 cursor-pointer rounded-2xl active:scale-[0.98] transition-all tracking-wide"
+                  className="ms-btn ms-btn-primary flex-1 cursor-pointer"
                 >
                   <span>{t('createMatch.continueToPlayers')}</span>
-                  <ArrowRight className="w-5 h-5 text-black dark:text-white" />
+                  <ArrowRight />
                 </button>
               </div>
             </div>
@@ -600,7 +670,7 @@ export default function CreateMatch() {
           {/* ============================================================ */}
           <Step title={t('createMatch.step3Title')}>
             <div className="flex flex-col gap-3.5 w-full pt-1">
-              <div className="ms-card p-3.5 border-ms-border-light bg-ms-bg-card rounded-2xl shadow-sm">
+              <div className="ms-card p-3.5 border-ms-border-light bg-ms-bg-card rounded-2xl shadow-sm overflow-visible">
                 <h2 className="text-xs font-bold text-ms-cyan uppercase tracking-wider mb-3 flex items-center gap-1.5">
                   <User className="w-3.5 h-3.5 text-black dark:text-white" />
                   <span>{t('createMatch.openingLineup')}</span>
@@ -609,40 +679,87 @@ export default function CreateMatch() {
                 <div className="space-y-3">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                      <label className="ms-input-label text-xs font-semibold">{t('createMatch.striker')}</label>
-                      <input
-                        type="text"
-                        name="striker_name"
+                      <label className="ms-input-label text-xs font-semibold">{t('createMatch.striker')} *</label>
+                      <PlayerSelector
                         value={formData.striker_name}
-                        onChange={handleChange}
+                        selectedId={formData.striker_id}
+                        onChange={(player) => {
+                          if (error) setError('');
+                          setFormData((prev) => ({
+                            ...prev,
+                            striker_name: player ? player.name : '',
+                            striker_id: player ? player.player_id : '',
+                            striker_uuid: player ? player.id : '',
+                            striker_photo: player ? (player.photo_url || '') : ''
+                          }));
+                        }}
+                        disabledPlayers={[
+                          formData.non_striker_uuid,
+                          formData.non_striker_id,
+                          formData.non_striker_name,
+                          formData.opening_bowler_uuid,
+                          formData.opening_bowler_id,
+                          formData.opening_bowler_name
+                        ].filter(Boolean)}
+                        placeholder="Search striker by name or ID..."
                         required
-                        placeholder={t('createMatch.strikerPlaceholder')}
-                        className="ms-input text-xs sm:text-sm uppercase py-2 rounded-xl"
                       />
                     </div>
 
                     <div>
-                      <label className="ms-input-label text-xs font-semibold">{t('createMatch.nonStriker')}</label>
-                      <input
-                        type="text"
-                        name="non_striker_name"
+                      <label className="ms-input-label text-xs font-semibold">{t('createMatch.nonStriker')} *</label>
+                      <PlayerSelector
                         value={formData.non_striker_name}
-                        onChange={handleChange}
-                        placeholder={t('createMatch.nonStrikerPlaceholder')}
-                        className="ms-input text-xs sm:text-sm uppercase py-2 rounded-xl"
+                        selectedId={formData.non_striker_id}
+                        onChange={(player) => {
+                          if (error) setError('');
+                          setFormData((prev) => ({
+                            ...prev,
+                            non_striker_name: player ? player.name : '',
+                            non_striker_id: player ? player.player_id : '',
+                            non_striker_uuid: player ? player.id : '',
+                            non_striker_photo: player ? (player.photo_url || '') : ''
+                          }));
+                        }}
+                        disabledPlayers={[
+                          formData.striker_uuid,
+                          formData.striker_id,
+                          formData.striker_name,
+                          formData.opening_bowler_uuid,
+                          formData.opening_bowler_id,
+                          formData.opening_bowler_name
+                        ].filter(Boolean)}
+                        placeholder="Search non-striker by name or ID..."
+                        required
                       />
                     </div>
                   </div>
 
                   <div>
-                    <label className="ms-input-label text-xs font-semibold">{t('createMatch.openingBowler')}</label>
-                    <input
-                      type="text"
-                      name="opening_bowler_name"
+                    <label className="ms-input-label text-xs font-semibold">{t('createMatch.openingBowler')} *</label>
+                    <PlayerSelector
                       value={formData.opening_bowler_name}
-                      onChange={handleChange}
-                      placeholder={t('createMatch.bowlerPlaceholder')}
-                      className="ms-input text-xs sm:text-sm uppercase py-2 rounded-xl"
+                      selectedId={formData.opening_bowler_id}
+                      onChange={(player) => {
+                        if (error) setError('');
+                        setFormData((prev) => ({
+                          ...prev,
+                          opening_bowler_name: player ? player.name : '',
+                          opening_bowler_id: player ? player.player_id : '',
+                          opening_bowler_uuid: player ? player.id : '',
+                          opening_bowler_photo: player ? (player.photo_url || '') : ''
+                        }));
+                      }}
+                      disabledPlayers={[
+                        formData.striker_uuid,
+                        formData.striker_id,
+                        formData.striker_name,
+                        formData.non_striker_uuid,
+                        formData.non_striker_id,
+                        formData.non_striker_name
+                      ].filter(Boolean)}
+                      placeholder="Search opening bowler by name or ID..."
+                      required
                     />
                   </div>
                 </div>
@@ -665,18 +782,17 @@ export default function CreateMatch() {
                   type="button"
                   onClick={handleBack}
                   disabled={loading}
-                  className="ms-btn ms-btn-secondary py-3.5 sm:py-4 px-5 text-sm sm:text-base font-bold flex items-center justify-center gap-1.5 cursor-pointer rounded-2xl active:scale-[0.98] transition-all flex-none"
+                  className="ms-btn ms-btn-outline cursor-pointer flex-none"
                 >
-                  <ArrowLeft className="w-4 h-4" />
+                  <ArrowLeft />
                   <span>{t('common.back')}</span>
                 </button>
                 <button
                   type="submit"
                   disabled={loading}
-                  className="ms-btn ms-btn-primary flex-1 py-3.5 sm:py-4 text-sm sm:text-base font-black shadow-lg shadow-cyan-900/30 flex items-center justify-center gap-2.5 cursor-pointer rounded-2xl active:scale-[0.98] transition-all disabled:opacity-50 tracking-wide"
+                  className="ms-btn ms-btn-primary flex-1 cursor-pointer disabled:opacity-50"
                 >
                   <span>{loading ? t('createMatch.creatingMatch') : t('createMatch.startMatch')}</span>
-                  <Sparkles className="w-5 h-5 text-black dark:text-white" />
                 </button>
               </div>
             </div>

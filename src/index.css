@@ -17,11 +17,22 @@
   --ms-text-muted: #64748b;
   --ms-text-inverse: #0a0f1e;
 
-  --ms-cyan: #06b6d4;
-  --ms-cyan-light: #22d3ee;
-  --ms-cyan-dark: #0891b2;
-  --ms-cyan-glow: rgba(6, 182, 212, 0.25);
-  --ms-cyan-subtle: rgba(6, 182, 212, 0.08);
+  --ms-cyan: #0782C6;
+  --ms-cyan-light: #38bdf8;
+  --ms-cyan-dark: #0670ab;
+  --ms-cyan-glow: rgba(7, 130, 198, 0.42);
+  --ms-cyan-subtle: rgba(7, 130, 198, 0.1);
+
+  /* Centralized Global Primary Brand Colour (#0782C6) */
+  --primary-color: #0782C6;
+  --primary-color-hover: #0670ab;
+  --primary-color-active: #045684;
+  --primary-color-glow: rgba(7, 130, 198, 0.42);
+
+  --ms-primary-cyan: var(--primary-color);
+  --ms-primary-cyan-hover: var(--primary-color-hover);
+  --ms-primary-cyan-active: var(--primary-color-active);
+  --ms-primary-cyan-glow: var(--primary-color-glow);
 
   --ms-live: #ef4444;
   --ms-live-glow: rgba(239, 68, 68, 0.35);
@@ -39,25 +50,59 @@
   --ms-success: #22c55e;
   --ms-warning: #f59e0b;
   --ms-danger: #ef4444;
+
+  /* Plain CSS aliases so var(--color-ms-*) always resolves in all CSS rules */
+  --color-ms-bg-primary: var(--ms-bg-primary);
+  --color-ms-bg-secondary: var(--ms-bg-secondary);
+  --color-ms-bg-card: var(--ms-bg-card);
+  --color-ms-bg-elevated: var(--ms-bg-elevated);
+  --color-ms-bg-input: var(--ms-bg-input);
+  --color-ms-text-primary: var(--ms-text-primary);
+  --color-ms-text-secondary: var(--ms-text-secondary);
+  --color-ms-text-muted: var(--ms-text-muted);
+  --color-ms-text-inverse: var(--ms-text-inverse);
+  --color-ms-cyan: var(--ms-cyan);
+  --color-ms-cyan-light: var(--ms-cyan-light);
+  --color-ms-cyan-dark: var(--ms-cyan-dark);
+  --color-primary-color: var(--primary-color);
+  --color-primary-color-hover: var(--primary-color-hover);
+  --color-primary-color-active: var(--primary-color-active);
+  --color-primary-color-glow: var(--primary-color-glow);
+  --color-ms-primary-cyan: var(--primary-color);
+  --color-ms-primary-cyan-hover: var(--primary-color-hover);
+  --color-ms-primary-cyan-active: var(--primary-color-active);
+  --color-ms-primary-cyan-glow: var(--primary-color-glow);
+  --color-ms-border: var(--ms-border);
+  --color-ms-border-light: var(--ms-border-light);
 }
 
 [data-theme="light"], .light {
-  --ms-bg-primary: #f8fafc;
+  --ms-bg-primary: #f2f2f7;
   --ms-bg-secondary: #ffffff;
   --ms-bg-card: #ffffff;
-  --ms-bg-elevated: #f1f5f9;
-  --ms-bg-input: #f8fafc;
+  --ms-bg-elevated: #ffffff;
+  --ms-bg-input: #ffffff;
 
-  --ms-text-primary: #0f172a;
-  --ms-text-secondary: #334155;
+  --ms-text-primary: #000000;
+  --ms-text-secondary: #1e293b;
   --ms-text-muted: #475569;
-  --ms-text-inverse: #0a0f1e;
+  --ms-text-inverse: #ffffff;
 
-  --ms-cyan: #0284c7;
+  --primary-color: #0782C6;
+  --primary-color-hover: #0670ab;
+  --primary-color-active: #045684;
+  --primary-color-glow: rgba(7, 130, 198, 0.42);
+
+  --ms-cyan: #0782C6;
   --ms-cyan-light: #38bdf8;
-  --ms-cyan-dark: #0369a1;
-  --ms-cyan-glow: rgba(2, 132, 199, 0.25);
-  --ms-cyan-subtle: rgba(2, 132, 199, 0.1);
+  --ms-cyan-dark: #0670ab;
+  --ms-cyan-glow: rgba(7, 130, 198, 0.25);
+  --ms-cyan-subtle: rgba(7, 130, 198, 0.1);
+
+  --ms-primary-cyan: var(--primary-color);
+  --ms-primary-cyan-hover: var(--primary-color-hover);
+  --ms-primary-cyan-active: var(--primary-color-active);
+  --ms-primary-cyan-glow: var(--primary-color-glow);
 
   --ms-live: #dc2626;
   --ms-live-glow: rgba(220, 38, 38, 0.35);
@@ -69,12 +114,28 @@
   --ms-dot: #64748b;
   --ms-extra: #2563eb;
 
-  --ms-border: #cbd5e1;
-  --ms-border-light: #94a3b8;
+  --ms-border: #e2e8f0;
+  --ms-border-light: #cbd5e1;
 
   --ms-success: #16a34a;
   --ms-warning: #d97706;
   --ms-danger: #dc2626;
+
+  /* Plain CSS aliases for light theme */
+  --color-ms-bg-primary: var(--ms-bg-primary);
+  --color-ms-bg-secondary: var(--ms-bg-secondary);
+  --color-ms-bg-card: var(--ms-bg-card);
+  --color-ms-bg-elevated: var(--ms-bg-elevated);
+  --color-ms-bg-input: var(--ms-bg-input);
+  --color-ms-text-primary: var(--ms-text-primary);
+  --color-ms-text-secondary: var(--ms-text-secondary);
+  --color-ms-text-muted: var(--ms-text-muted);
+  --color-ms-text-inverse: var(--ms-text-inverse);
+  --color-ms-cyan: var(--ms-cyan);
+  --color-ms-cyan-light: var(--ms-cyan-light);
+  --color-ms-cyan-dark: var(--ms-cyan-dark);
+  --color-ms-border: var(--ms-border);
+  --color-ms-border-light: var(--ms-border-light);
 }
 
 @theme {
@@ -218,13 +279,25 @@ svg.lucide,
   overflow-x: hidden;
 }
 
-/* Safe area for mobile / Capacitor */
+/* Safe area for mobile / Capacitor & Edge-to-Edge */
+:root {
+  --sat: 0px;
+  --sab: 0px;
+  --safe-top: max(env(safe-area-inset-top, 0px), var(--sat, 0px));
+  --safe-bottom: max(env(safe-area-inset-bottom, 0px), var(--sab, 0px));
+}
+
 .safe-area-top {
-  padding-top: env(safe-area-inset-top, 0px);
+  padding-top: var(--safe-top);
 }
 
 .safe-area-bottom {
-  padding-bottom: env(safe-area-inset-bottom, 0px);
+  padding-bottom: var(--safe-bottom);
+}
+
+.ms-mobile-header {
+  padding-top: calc(0.375rem + var(--safe-top));
+  padding-bottom: 0.375rem;
 }
 
 /* ======================================================
@@ -242,9 +315,14 @@ svg.lucide,
   margin-left: 0 !important;
   margin-right: 0 !important;
   margin-inline: 0 !important;
-  overflow: hidden;
+  overflow: visible;
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+[data-theme="light"] .ms-card,
+.light .ms-card {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 }
 
 .ms-card-elevated {
@@ -257,8 +335,13 @@ svg.lucide,
   margin-left: 0 !important;
   margin-right: 0 !important;
   margin-inline: 0 !important;
-  overflow: hidden;
+  overflow: visible;
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+}
+
+[data-theme="light"] .ms-card-elevated,
+.light .ms-card-elevated {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 }
 
 /* Score typography: Barlow Condensed Bold/SemiBold */
@@ -379,74 +462,286 @@ svg.lucide,
   border: 1px solid var(--color-ms-extra);
 }
 
-/* Interactive button base - Emil Kowalski design engineering principles */
+/* ======================================================
+   MOONLIGHT STRIKERS — Standardized Capsule Button System
+   Matches Reference Design:
+   - Rounded capsule (border-radius: 9999px)
+   - Height: 44-48px (standard), 36px (sm), 48-52px (lg)
+   - Font: 14-15px (0.875rem-0.9375rem), font-weight: 600
+   - Strict monochrome icons (white on dark/filled, dark on light)
+   - Variants: Primary (filled blue), Secondary/Outline, Elevated/Soft, Destructive/Danger
+   ====================================================== */
+
 .ms-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 0.5rem;
-  padding: 0.5rem 0.875rem;
-  font-size: 0.875rem;
+  gap: 0.55rem;
+  min-height: 44px;
+  height: 44px;
+  padding: 0 1.25rem;
+  font-size: 0.9rem;
   font-weight: 600;
-  border-radius: var(--radius-md);
-  border: none;
+  border-radius: 9999px !important;
+  border: 1.5px solid transparent;
   cursor: pointer;
   transition: transform 140ms cubic-bezier(0.23, 1, 0.32, 1), background-color 140ms ease-out, border-color 140ms ease-out, box-shadow 140ms ease-out;
   text-decoration: none;
   line-height: 1.25;
+  white-space: nowrap;
+  user-select: none;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.ms-btn svg {
+  width: 18px !important;
+  height: 18px !important;
+  flex-shrink: 0;
+  stroke-width: 2px;
+}
+
+/* Sizing modifiers */
+.ms-btn-sm {
+  min-height: 36px;
+  height: 36px;
+  padding: 0 1rem;
+  font-size: 0.8125rem;
+}
+.ms-btn-sm svg {
+  width: 16px !important;
+  height: 16px !important;
+}
+
+.ms-btn-lg {
+  min-height: 48px;
+  height: 48px;
+  padding: 0 1.5rem;
+  font-size: 0.95rem;
+}
+.ms-btn-lg svg {
+  width: 20px !important;
+  height: 20px !important;
+}
+
+.ms-btn-icon {
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
+}
+.ms-btn-icon.ms-btn-sm {
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  min-height: 36px;
 }
 
 .ms-btn:active:not(:disabled) {
   transform: scale(0.97);
 }
 
-.ms-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+.ms-btn:disabled,
+.ms-btn[disabled],
+.ms-btn-primary:disabled,
+.ms-btn-secondary:disabled,
+.ms-btn-outline:disabled {
+  opacity: 0.45;
+  cursor: not-allowed !important;
+  pointer-events: none;
+  box-shadow: none !important;
 }
 
+/* 1. Primary / Filled Button (Unified Primary Blue #0782C6) */
 .ms-btn-primary {
-  background-color: var(--color-ms-cyan);
-  color: var(--color-ms-text-inverse);
-  font-weight: 700;
+  background-color: var(--primary-color, #0782C6) !important;
+  color: #ffffff !important;
+  border: 1.5px solid transparent !important;
+  box-shadow: 0 4px 14px -2px rgba(7, 130, 198, 0.42), 0 2px 6px -1px rgba(0, 0, 0, 0.1);
 }
 
-[data-theme="light"] .ms-btn-primary,
-.light .ms-btn-primary {
-  color: #000000;
+.ms-btn-primary svg {
+  color: #ffffff !important;
+  stroke: #ffffff !important;
 }
 
 .ms-btn-primary:hover:not(:disabled) {
-  background-color: var(--color-ms-cyan-light);
+  background-color: var(--primary-color-hover, #0670ab) !important;
+  border-color: transparent !important;
+  box-shadow: 0 6px 18px -2px rgba(7, 130, 198, 0.52);
 }
 
-.ms-btn-secondary {
-  background-color: var(--color-ms-bg-elevated);
-  color: var(--color-ms-text-primary);
-  border: 1px solid var(--color-ms-border-light);
+.ms-btn-primary:active:not(:disabled) {
+  background-color: var(--primary-color-active, #045684) !important;
+  transform: scale(0.97);
 }
 
-.ms-btn-secondary:hover:not(:disabled) {
-  background-color: var(--color-ms-border-light);
+[data-theme="dark"] .ms-btn-primary,
+.dark .ms-btn-primary {
+  background-color: var(--primary-color, #0782C6) !important;
+  color: #ffffff !important;
+  border-color: transparent !important;
+  box-shadow: 0 4px 16px -2px rgba(7, 130, 198, 0.45);
 }
 
-.ms-btn-danger {
-  background-color: var(--color-ms-danger);
-  color: white;
+[data-theme="dark"] .ms-btn-primary:hover:not(:disabled),
+.dark .ms-btn-primary:hover:not(:disabled) {
+  background-color: var(--primary-color-hover, #0670ab) !important;
 }
 
-.ms-btn-danger:hover:not(:disabled) {
+[data-theme="dark"] .ms-btn-primary:active:not(:disabled),
+.dark .ms-btn-primary:active:not(:disabled) {
+  background-color: var(--primary-color-active, #045684) !important;
+  transform: scale(0.97);
+}
+
+/* 2. Secondary / Outline Button (Primary Blue #0782C6 border & text) */
+.ms-btn-secondary,
+.ms-btn-outline {
+  background-color: transparent !important;
+  color: var(--primary-color, #0782C6) !important;
+  border: 1.5px solid var(--primary-color, #0782C6) !important;
+  box-shadow: 0 2px 8px -1px rgba(7, 130, 198, 0.2);
+}
+
+.ms-btn-secondary svg,
+.ms-btn-outline svg {
+  color: var(--primary-color, #0782C6) !important;
+  stroke: var(--primary-color, #0782C6) !important;
+}
+
+.ms-btn-secondary:hover:not(:disabled),
+.ms-btn-outline:hover:not(:disabled) {
+  background-color: rgba(7, 130, 198, 0.08) !important;
+  border-color: var(--primary-color-hover, #0670ab) !important;
+  color: var(--primary-color-hover, #0670ab) !important;
+}
+
+.ms-btn-secondary:hover:not(:disabled) svg,
+.ms-btn-outline:hover:not(:disabled) svg {
+  color: var(--primary-color-hover, #0670ab) !important;
+  stroke: var(--primary-color-hover, #0670ab) !important;
+}
+
+[data-theme="dark"] .ms-btn-secondary,
+[data-theme="dark"] .ms-btn-outline,
+.dark .ms-btn-secondary,
+.dark .ms-btn-outline {
+  background-color: transparent !important;
+  color: var(--primary-color, #0782C6) !important;
+  border: 1.5px solid var(--primary-color, #0782C6) !important;
+  box-shadow: 0 2px 10px -1px rgba(7, 130, 198, 0.3);
+}
+
+[data-theme="dark"] .ms-btn-secondary svg,
+[data-theme="dark"] .ms-btn-outline svg,
+.dark .ms-btn-secondary svg,
+.dark .ms-btn-outline svg {
+  color: var(--primary-color, #0782C6) !important;
+  stroke: var(--primary-color, #0782C6) !important;
+}
+
+[data-theme="dark"] .ms-btn-secondary:hover:not(:disabled),
+[data-theme="dark"] .ms-btn-outline:hover:not(:disabled),
+.dark .ms-btn-secondary:hover:not(:disabled),
+.dark .ms-btn-outline:hover:not(:disabled) {
+  background-color: rgba(7, 130, 198, 0.12) !important;
+  border-color: #38bdf8 !important;
+  color: #38bdf8 !important;
+}
+
+[data-theme="dark"] .ms-btn-secondary:hover:not(:disabled) svg,
+[data-theme="dark"] .ms-btn-outline:hover:not(:disabled) svg,
+.dark .ms-btn-secondary:hover:not(:disabled) svg,
+.dark .ms-btn-outline:hover:not(:disabled) svg {
+  color: #38bdf8 !important;
+  stroke: #38bdf8 !important;
+}
+
+/* 3. Soft / Elevated Button (Reference Column 1) */
+.ms-btn-elevated,
+.ms-btn-soft {
+  background-color: #ffffff;
+  color: #0f172a !important;
+  border: 1px solid rgba(203, 213, 225, 0.7);
+  box-shadow: 0 4px 14px -2px rgba(0, 0, 0, 0.08), 0 2px 4px -1px rgba(0, 0, 0, 0.04);
+}
+
+.ms-btn-elevated svg,
+.ms-btn-soft svg {
+  color: #0f172a !important;
+  stroke: #0f172a !important;
+}
+
+.ms-btn-elevated:hover:not(:disabled),
+.ms-btn-soft:hover:not(:disabled) {
+  background-color: #f8fafc;
+  border-color: #94a3b8;
+  box-shadow: 0 6px 18px -2px rgba(0, 0, 0, 0.12);
+}
+
+[data-theme="dark"] .ms-btn-elevated,
+[data-theme="dark"] .ms-btn-soft,
+.dark .ms-btn-elevated,
+.dark .ms-btn-soft {
+  background-color: #111e38;
+  color: #ffffff !important;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 4px 16px -2px rgba(0, 0, 0, 0.45);
+}
+
+[data-theme="dark"] .ms-btn-elevated svg,
+[data-theme="dark"] .ms-btn-soft svg,
+.dark .ms-btn-elevated svg,
+.dark .ms-btn-soft svg {
+  color: #ffffff !important;
+  stroke: #ffffff !important;
+}
+
+[data-theme="dark"] .ms-btn-elevated:hover:not(:disabled),
+[data-theme="dark"] .ms-btn-soft:hover:not(:disabled),
+.dark .ms-btn-elevated:hover:not(:disabled),
+.dark .ms-btn-soft:hover:not(:disabled) {
+  background-color: #162646;
+  border-color: rgba(255, 255, 255, 0.22);
+}
+
+/* 4. Destructive / Danger Button */
+.ms-btn-danger,
+.ms-btn-destructive {
   background-color: #dc2626;
+  color: #ffffff !important;
+  border-color: transparent;
+  box-shadow: 0 4px 14px -2px rgba(220, 38, 38, 0.4);
 }
 
+.ms-btn-danger svg,
+.ms-btn-destructive svg {
+  color: #ffffff !important;
+  stroke: #ffffff !important;
+}
+
+.ms-btn-danger:hover:not(:disabled),
+.ms-btn-destructive:hover:not(:disabled) {
+  background-color: #b91c1c;
+}
+
+/* 5. Ghost Button */
 .ms-btn-ghost {
   background: transparent;
   color: var(--color-ms-text-secondary);
+  border-color: transparent;
+}
+
+.ms-btn-ghost svg {
+  color: currentColor;
+  stroke: currentColor;
 }
 
 .ms-btn-ghost:hover:not(:disabled) {
   color: var(--color-ms-text-primary);
-  background-color: var(--color-ms-cyan-subtle);
+  background-color: rgba(2, 132, 199, 0.1);
 }
 
 /* Input fields */
@@ -462,8 +757,20 @@ svg.lucide,
   transition: border-color 0.15s ease;
 }
 
+[data-theme="light"] .ms-input,
+.light .ms-input {
+  color: #000000;
+  background-color: #ffffff;
+  border-color: #cbd5e1;
+}
+
 .ms-input::placeholder {
   color: var(--color-ms-text-muted);
+}
+
+[data-theme="light"] .ms-input::placeholder,
+.light .ms-input::placeholder {
+  color: #64748b;
 }
 
 .ms-input:focus {
@@ -474,9 +781,14 @@ svg.lucide,
 .ms-input-label {
   display: block;
   font-size: 0.8125rem;
-  font-weight: 500;
+  font-weight: 600;
   color: var(--color-ms-text-secondary);
   margin-bottom: 0.375rem;
+}
+
+[data-theme="light"] .ms-input-label,
+.light .ms-input-label {
+  color: #0f172a;
 }
 
 /* Select / dropdown */
@@ -547,14 +859,16 @@ svg.lucide,
 .ms-segmented-item.ms-segmented-item-active:focus,
 .ms-segmented-item.ms-segmented-item-active:focus-visible,
 .ms-segmented-item.ms-segmented-item-active:active {
-  background-color: var(--color-ms-cyan) !important;
-  color: var(--color-ms-text-inverse) !important;
-  border-color: var(--color-ms-cyan) !important;
-  box-shadow: 0 1px 4px var(--color-ms-cyan-glow) !important;
+  background-color: var(--primary-color, #0782C6) !important;
+  color: #ffffff !important;
+  border-color: var(--primary-color, #0782C6) !important;
+  box-shadow: 0 4px 14px -2px rgba(7, 130, 198, 0.42), 0 2px 6px -1px rgba(0, 0, 0, 0.1) !important;
 }
 
-.ms-segmented-item.ms-segmented-item-active * {
-  color: var(--color-ms-text-inverse) !important;
+.ms-segmented-item.ms-segmented-item-active *,
+.ms-segmented-item.ms-segmented-item-active svg {
+  color: #ffffff !important;
+  stroke: #ffffff !important;
 }
 
 /* Table styling */
@@ -599,6 +913,122 @@ svg.lucide,
   background-color: var(--color-ms-cyan-subtle);
 }
 
+/* Responsive table padding on mobile screens */
+@media (max-width: 640px) {
+  .ms-table th,
+  .ms-table td {
+    padding: 0.5rem 0.35rem;
+    font-size: 0.75rem;
+  }
+  .ms-table th:first-child,
+  .ms-table td:first-child {
+    padding-left: 0.5rem;
+  }
+  .ms-table th:last-child,
+  .ms-table td:last-child {
+    padding-right: 0.875rem; /* Generous right padding so 6s and 4s are completely visible without edge crowding */
+  }
+}
+
+[data-theme="light"] .ms-table th,
+.light .ms-table th {
+  color: #0f172a;
+  background-color: rgba(0, 0, 0, 0.03);
+  border-bottom-color: #cbd5e1;
+}
+
+[data-theme="light"] .ms-table td,
+.light .ms-table td {
+  color: #000000;
+  border-bottom-color: #e2e8f0;
+}
+
+/* Floating Segmented Pill Navigation for Records (matching reference image) */
+.ms-records-nav {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0;
+  padding: 0.375rem;
+  border-radius: 9999px; /* Large rounded-pill container */
+  background-color: #ffffff; /* Clean white background in Light Mode */
+  border: none;
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.06), 0 2px 6px -1px rgba(0, 0, 0, 0.04); /* Subtle, soft shadow */
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 28rem;
+  margin: 0.5rem auto 1.5rem auto;
+  transition: background-color 200ms ease, box-shadow 200ms ease;
+}
+
+[data-theme="dark"] .ms-records-nav,
+.dark .ms-records-nav {
+  background-color: var(--ms-bg-card, #162032); /* Existing dark theme surface */
+  box-shadow: 0 4px 24px -2px rgba(0, 0, 0, 0.4), 0 2px 8px -1px rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.ms-records-tab {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.625rem 0.75rem;
+  border-radius: 9999px; /* Rounded-pill shape */
+  font-family: inherit;
+  font-size: 0.875rem; /* 14px */
+  font-weight: 600;
+  cursor: pointer;
+  background-color: transparent;
+  border: none;
+  color: #475569 !important; /* Muted dark-grey in Light Mode */
+  transition: all 200ms ease-in-out; /* Smooth 200ms transition */
+  min-height: 2.75rem; /* Touch friendly ~44px target */
+  user-select: none;
+  text-align: center;
+  outline: none;
+  width: 100%;
+}
+
+.ms-records-tab:hover {
+  color: #1e293b !important;
+}
+
+.ms-records-tab:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--primary-color, #0782C6);
+}
+
+/* Selected Tab in Light Mode: matches primary brand blue (#0782C6), white text */
+.ms-records-tab-active,
+[data-theme="light"] .ms-records-tab-active,
+.light .ms-records-tab-active {
+  background-color: var(--primary-color, #0782C6) !important; /* Exact match with .ms-btn-primary */
+  border-color: transparent !important;
+  color: #ffffff !important; /* White text */
+  font-weight: 600 !important;
+  box-shadow: 0 4px 14px -2px rgba(7, 130, 198, 0.42), 0 2px 6px -1px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* Dark Mode Inactive Tab: muted light grey */
+[data-theme="dark"] .ms-records-tab,
+.dark .ms-records-tab {
+  color: #94a3b8 !important; /* Muted light grey */
+}
+
+[data-theme="dark"] .ms-records-tab:hover,
+.dark .ms-records-tab:hover {
+  color: #f1f5f9 !important;
+}
+
+/* Dark Mode Active Tab: matches primary brand blue (#0782C6), white text */
+[data-theme="dark"] .ms-records-tab-active,
+.dark .ms-records-tab-active {
+  background-color: var(--primary-color, #0782C6) !important; /* Exact match with .ms-btn-primary */
+  border-color: transparent !important;
+  color: #ffffff !important; /* White text */
+  font-weight: 600 !important;
+  box-shadow: 0 4px 16px -2px rgba(7, 130, 198, 0.45) !important;
+}
+
 /* Tab navigation */
 .ms-tabs {
   display: flex;
@@ -627,46 +1057,108 @@ svg.lucide,
   border-bottom-color: var(--color-ms-cyan);
 }
 
-/* Bottom navigation (mobile) */
-.ms-bottom-nav {
+/* Capsule Bottom Navigation (Mobile) — matching reference image */
+.ms-bottom-nav-container {
   position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
+  bottom: calc(0.75rem + var(--safe-bottom));
+  left: 50%;
+  transform: translateX(-50%);
+  width: calc(100% - 1.25rem);
+  max-width: 440px;
   z-index: 50;
-  display: flex;
-  align-items: stretch;
-  background-color: var(--color-ms-bg-secondary);
-  border-top: 1px solid var(--color-ms-border);
-  padding-bottom: env(safe-area-inset-bottom, 0px);
+  pointer-events: auto;
 }
 
-.ms-bottom-nav-item {
-  flex: 1;
+.ms-bottom-nav-outer {
+  background-color: #070d18;
+  border-radius: 9999px;
+  padding: 0.35rem;
+  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.65), 0 2px 6px rgba(0, 0, 0, 0.3), 0 0 16px rgba(6, 182, 212, 0.2);
+  border: 1.5px solid var(--color-ms-cyan);
+  transition: background-color 200ms ease, border-color 200ms ease, box-shadow 200ms ease;
+}
+
+[data-theme="light"] .ms-bottom-nav-outer,
+.light .ms-bottom-nav-outer {
+  background-color: #ffffff;
+  border: 1.5px solid #000000;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1), 0 2px 6px rgba(0, 0, 0, 0.05);
+}
+
+.ms-bottom-nav-inner {
+  position: relative;
+  background-color: #0d1627;
+  border: 1px solid #1f2e49;
+  border-radius: 9999px;
+  padding: 0.25rem;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  align-items: center;
+  transition: background-color 200ms ease, border-color 200ms ease;
+}
+
+[data-theme="light"] .ms-bottom-nav-inner,
+.light .ms-bottom-nav-inner {
+  background-color: #f1f5f9;
+  border: 1px solid #e2e8f0;
+}
+
+.ms-bottom-nav-pill {
+  position: absolute;
+  top: 0.25rem;
+  bottom: 0.25rem;
+  border-radius: 9999px;
+  background-color: #162a45;
+  border: 1.5px solid var(--color-ms-cyan);
+  box-shadow: 0 0 12px rgba(6, 182, 212, 0.3);
+  transition: transform 300ms cubic-bezier(0.25, 1, 0.5, 1), opacity 200ms ease, background-color 200ms ease, border-color 200ms ease;
+  pointer-events: none;
+}
+
+[data-theme="light"] .ms-bottom-nav-pill,
+.light .ms-bottom-nav-pill {
+  background-color: var(--color-ms-cyan);
+  border-color: transparent;
+  box-shadow: 0 2px 8px rgba(2, 132, 199, 0.35);
+}
+
+.ms-bottom-nav-link {
+  position: relative;
+  z-index: 10;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 0.25rem;
-  padding: 0.5rem 0;
-  font-size: 0.625rem;
-  font-weight: 500;
-  color: var(--color-ms-text-muted);
+  gap: 0.2rem;
+  padding: 0.45rem 0.125rem;
+  border-radius: 9999px;
   text-decoration: none;
-  transition: color 0.15s ease;
+  cursor: pointer;
   border: none;
   background: transparent;
-  cursor: pointer;
+  outline: none;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  color: var(--color-ms-text-muted);
+  font-weight: 500;
+  transition: color 200ms ease;
 }
 
-.ms-bottom-nav-item:hover,
-.ms-bottom-nav-item-active {
-  color: var(--color-ms-cyan);
+[data-theme="light"] .ms-bottom-nav-link,
+.light .ms-bottom-nav-link {
+  color: #0f172a;
+  font-weight: 600;
 }
 
-.ms-bottom-nav-item svg {
-  width: 1.25rem;
-  height: 1.25rem;
+.ms-bottom-nav-link-active {
+  color: var(--color-ms-cyan) !important;
+  font-weight: 700 !important;
+}
+
+[data-theme="light"] .ms-bottom-nav-link-active,
+.light .ms-bottom-nav-link-active {
+  color: #ffffff !important;
+  font-weight: 700 !important;
 }
 
 /* Scrollbar styling — hidden on mobile touch devices to eliminate unwanted track bars */
@@ -979,6 +1471,16 @@ svg.lucide,
 
 .ms-shadow-flipping {
   animation: ms-shadow-flight 2.4s cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-8px); }
+  40%, 80% { transform: translateX(8px); }
+}
+
+.animate-shake {
+  animation: shake 0.4s ease-in-out;
 }
 
 

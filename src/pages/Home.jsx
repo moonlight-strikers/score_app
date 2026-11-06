@@ -13,11 +13,17 @@ import { matchService } from '../services/matchService';
 import { supabase } from '../services/supabase';
 import { shareMatchResult, isTwoDaysOld, formatMatchDate, formatMatchTime } from '../utils/shareMatch';
 import { getMatchDisplayTeams } from '../utils/matchDisplay';
+import { useAdmin } from '../contexts/AdminContext';
+import ConfirmModal from '../components/ConfirmModal';
 
 export default function Home() {
+  const { isAdmin, adminToken } = useAdmin();
   const [recentMatches, setRecentMatches] = useState([]);
   const [loading, setLoading] = useState(true);
   const [shareSuccess, setShareSuccess] = useState(false);
+  const [matchToDelete, setMatchToDelete] = useState(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState(null);
 
   useEffect(() => {
     loadDashboard();
@@ -49,12 +55,27 @@ export default function Home() {
     }
   }
 
-  const handleDeleteMatch = async (e, matchId) => {
+  const handleDeleteMatch = (e, match) => {
     e.preventDefault();
     e.stopPropagation();
-    if (window.confirm('Are you sure you want to delete this match? This cannot be undone.')) {
-      await matchService.deleteMatch(matchId);
+    setDeleteError(null);
+    setMatchToDelete(match);
+  };
+
+  const handleConfirmDeleteMatch = async () => {
+    if (!matchToDelete) return;
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      const matchId = typeof matchToDelete === 'object' ? matchToDelete.id : matchToDelete;
+      await matchService.deleteMatch(matchId, adminToken);
       setRecentMatches((prev) => prev.filter((m) => m.id !== matchId));
+      setMatchToDelete(null);
+    } catch (err) {
+      console.error('Delete match error:', err);
+      setDeleteError(err.message || 'Failed to delete match.');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -95,13 +116,13 @@ export default function Home() {
         {/* Quick Actions */}
         <div className="flex items-center justify-center gap-2 mt-3 w-full">
           {liveMatches.length > 0 && (
-            <Link to="/matches/create" className="ms-btn ms-btn-primary text-xs py-1.5 px-3 rounded-lg shadow-sm flex items-center justify-center gap-1.5 font-bold flex-1 max-w-[170px]">
-              <Plus className="w-3.5 h-3.5 flex-shrink-0" />
+            <Link to="/matches/create" className="ms-btn ms-btn-primary ms-btn-sm flex-1 max-w-[170px]">
+              <Plus />
               <span className="truncate">Start Match</span>
             </Link>
           )}
-          <Link to="/matches" className="ms-btn ms-btn-secondary text-xs py-1.5 px-3 rounded-lg flex items-center justify-center gap-1.5 font-semibold flex-1 max-w-[170px]">
-            <Trophy className="w-3.5 h-3.5 text-ms-cyan flex-shrink-0" />
+          <Link to="/matches" className="ms-btn ms-btn-outline ms-btn-sm flex-1 max-w-[170px]">
+            <Trophy />
             <span className="truncate">Matches</span>
           </Link>
         </div>
@@ -123,9 +144,9 @@ export default function Home() {
               </p>
               <Link
                 to="/matches/create"
-                className="ms-btn ms-btn-primary text-xs sm:text-sm py-2 px-6 rounded-xl shadow-md flex items-center justify-center gap-2 font-bold w-full max-w-[200px] cursor-pointer active:scale-95 transition-all"
+                className="ms-btn ms-btn-primary ms-btn-md w-full max-w-[200px]"
               >
-                <Plus className="w-4 h-4 flex-shrink-0" />
+                <Plus />
                 <span>Start Match</span>
               </Link>
             </div>
@@ -355,13 +376,13 @@ export default function Home() {
                           <span className="hidden sm:inline">Share</span>
                         </button>
 
-                        {/* Delete Option for matches 2+ days old */}
-                        {isOld && (
+                        {/* Delete Option strictly for Admin */}
+                        {isAdmin && (
                           <button
                             type="button"
-                            onClick={(e) => handleDeleteMatch(e, match.id)}
+                            onClick={(e) => handleDeleteMatch(e, match)}
                             className="p-1 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/30 transition-colors cursor-pointer"
-                            title="Delete match (2+ days old)"
+                            title="Delete match (Admin)"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
@@ -370,14 +391,14 @@ export default function Home() {
                     </div>
                   )}
 
-                  {/* If not completed but 2+ days old, show delete option */}
-                  {!isCompleted && isOld && (
+                  {/* If not completed, show delete option strictly for Admin */}
+                  {!isCompleted && isAdmin && (
                     <div className="mt-2 pt-1.5 border-t border-ms-border flex justify-end">
                       <button
                         type="button"
-                        onClick={(e) => handleDeleteMatch(e, match.id)}
+                        onClick={(e) => handleDeleteMatch(e, match)}
                         className="px-2 py-0.5 rounded text-[11px] text-red-500 hover:bg-red-500/10 flex items-center gap-1 cursor-pointer"
-                        title="Delete old match"
+                        title="Delete Match (Admin)"
                       >
                         <Trash2 className="w-3 h-3" />
                         <span>Delete Match</span>
@@ -390,6 +411,24 @@ export default function Home() {
           </div>
         )}
       </section>
+
+      {/* In-App Delete Confirmation Modal */}
+      <ConfirmModal
+        isOpen={Boolean(matchToDelete)}
+        onClose={() => {
+          if (!deleting) {
+            setMatchToDelete(null);
+            setDeleteError(null);
+          }
+        }}
+        onConfirm={handleConfirmDeleteMatch}
+        title="Delete Match Record?"
+        confirmText="Delete Match"
+        cancelText="Cancel"
+        isDestructive={true}
+        loading={deleting}
+        error={deleteError}
+      />
     </div>
   );
 }

@@ -9,6 +9,21 @@ export function useTheme() {
   return useContext(ThemeContext);
 }
 
+function syncStatusBarTheme(mode) {
+  try {
+    if (window.AndroidEdgeToEdge?.setStatusBarTheme) {
+      window.AndroidEdgeToEdge.setStatusBarTheme(mode);
+    }
+  } catch {}
+
+  try {
+    const metaThemeColor = document.querySelector('meta[name="theme-color"]');
+    if (metaThemeColor) {
+      metaThemeColor.setAttribute('content', mode === 'light' ? '#ffffff' : '#070d18');
+    }
+  } catch {}
+}
+
 export function ThemeProvider({ children }) {
   const [theme, setTheme] = useState(() => {
     try {
@@ -33,6 +48,14 @@ export function ThemeProvider({ children }) {
     try {
       localStorage.setItem('ms_theme', theme);
     } catch {}
+
+    syncStatusBarTheme(theme);
+    const t1 = setTimeout(() => syncStatusBarTheme(theme), 300);
+    const t2 = setTimeout(() => syncStatusBarTheme(theme), 1000);
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+    };
   }, [theme]);
 
   const toggleTheme = () => {

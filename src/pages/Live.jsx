@@ -42,8 +42,8 @@ export default function Live() {
           </p>
         </div>
 
-        <Link to="/matches/create" className="ms-btn ms-btn-primary text-xs py-1 px-2.5 rounded-lg">
-          <Plus className="w-3.5 h-3.5" />
+        <Link to="/matches/create" className="ms-btn ms-btn-primary ms-btn-sm">
+          <Plus />
           <span>New Match</span>
         </Link>
       </div>
@@ -63,11 +63,11 @@ export default function Live() {
             Live scores appear automatically here when a scorer begins scoring any match.
           </p>
           <div className="flex items-center justify-center gap-2.5 mt-4">
-            <Link to="/matches/create" className="ms-btn ms-btn-primary text-xs py-1.5 px-3 rounded-lg font-bold">
-              <Plus className="w-3.5 h-3.5" />
+            <Link to="/matches/create" className="ms-btn ms-btn-primary ms-btn-sm">
+              <Plus />
               <span>Start Match Now</span>
             </Link>
-            <Link to="/matches" className="ms-btn ms-btn-secondary text-xs py-1.5 px-3 rounded-lg font-medium">
+            <Link to="/matches" className="ms-btn ms-btn-outline ms-btn-sm">
               View Past Matches
             </Link>
           </div>

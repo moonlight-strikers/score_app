@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { formatOvers, calculateRunRate, calculateRequiredRunRate, calculateMatchEquation } from '../utils/cricketRules';
 import { Edit2, History, X } from 'lucide-react';
-import { CricketBatIcon, DotBallIcon } from './CricketIcons';
+import { DotBallIcon } from './CricketIcons';
+import PlayerAvatar from './PlayerAvatar';
 
 export default function Scoreboard({
   battingTeam = 'Team A',
@@ -165,7 +166,7 @@ export default function Scoreboard({
         <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-cyan-500 to-transparent opacity-60 dark:opacity-75" />
 
         {/* Main Scoreboard: Team, Prominent Center-Aligned Score, Overs, and CRR in right corner */}
-        <div className="relative pb-2.5 border-b border-slate-200/80 dark:border-cyan-500/20 text-center">
+        <div className="relative text-center">
           {/* Team & Innings Indicator */}
           <div className="flex items-center justify-center gap-2 mb-1">
             <span className="text-xs sm:text-sm text-cyan-700 dark:text-cyan-300 font-semibold uppercase tracking-wider">
@@ -215,89 +216,155 @@ export default function Scoreboard({
             )}
           </div>
         </div>
+      </div>
 
-        {/* Middle: Active Batters Table */}
-        <div className="py-2.5 border-b border-slate-200/80 dark:border-cyan-500/20 space-y-1.5">
-          <div className="flex items-center justify-between text-[10px] text-slate-400 dark:text-slate-400 uppercase font-semibold px-1">
-            <span>BATTER</span>
-            <div className="flex items-center gap-4 font-score font-semibold text-[11px] tabular-nums">
-              <span className="w-8 text-right">R</span>
-              <span className="w-8 text-right">B</span>
-              <span className="w-12 text-right">SR</span>
-            </div>
+      {/* Batter & Bowler Scoreboard Card (Exact UI Reference Match) */}
+      <div className="rounded-2xl sm:rounded-3xl border border-slate-300/90 dark:border-[#1b2b46] bg-white dark:bg-[#060c18] p-2.5 sm:p-3.5 text-slate-900 dark:text-white shadow-xs transition-colors">
+        {/* Top: Column Headings */}
+        <div className="flex items-center justify-between pb-1.5 px-1">
+          <span className="font-bold text-xs sm:text-sm text-slate-900 dark:text-white uppercase tracking-wider pl-1 font-sans">
+            BATTER
+          </span>
+          <div className="flex items-center font-bold text-xs sm:text-sm text-slate-900 dark:text-white font-score tracking-wider">
+            <span className="w-9 sm:w-11 text-center">R</span>
+            <span className="w-9 sm:w-11 text-center">B</span>
+            <span className="w-12 sm:w-15 text-center">SR</span>
           </div>
+        </div>
 
-          {/* Striker (Current Batter indicated by Bat Logo as in reference image) */}
-          <div className="flex items-center justify-between px-2.5 py-1.5 rounded-xl bg-cyan-50/70 dark:bg-cyan-950/40 border border-cyan-300/80 dark:border-cyan-500/40">
-            <div className="flex items-center gap-1.5 min-w-0 pr-2">
-              <CricketBatIcon className="w-4.5 h-4.5 flex-shrink-0 drop-shadow-xs" />
-              <span className="font-semibold text-sm text-slate-900 dark:text-white truncate uppercase tracking-tight">
+        {/* Clean horizontal divider below headings */}
+        <div className="border-b border-slate-200 dark:border-[#13233c] mb-2 sm:mb-2.5" />
+
+        {/* Batter Rows */}
+        <div className="space-y-1.5 sm:space-y-2">
+          {/* Striker (Active Selected Batter) */}
+          <div className="flex items-center justify-between px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-full border-2 border-slate-900 dark:border-white bg-white dark:bg-[#060c18] shadow-xs transition-all">
+            <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 pr-1 sm:pr-2">
+              <PlayerAvatar
+                key={striker?.id || striker?.player_id || striker?.name || 'striker'}
+                player={striker}
+                photoUrl={striker?.photo_url}
+                name={striker?.name}
+                size="sm"
+                className="w-7 h-7 sm:w-8 sm:h-8 border-[1.5px] border-cyan-400 dark:border-cyan-400 shadow-2xs flex-shrink-0"
+              />
+              <span className="font-bold text-xs sm:text-sm text-slate-900 dark:text-white truncate uppercase tracking-tight">
                 {striker?.name || 'Striker'}
               </span>
               <button
                 type="button"
                 onClick={() => onEditPlayer('striker', striker?.name || 'Striker')}
-                className="p-0.5 text-cyan-600 dark:text-cyan-400 hover:text-cyan-800 dark:hover:text-white transition-colors cursor-pointer"
+                className="p-0.5 text-cyan-600 dark:text-cyan-400 hover:text-cyan-800 dark:hover:text-cyan-300 transition-colors flex-shrink-0 cursor-pointer"
                 title="Edit striker name"
               >
-                <Edit2 className="w-3 h-3" />
+                <Edit2 className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
               </button>
             </div>
-            <div className="flex items-center gap-4 font-score text-xs flex-shrink-0 tabular-nums">
-              <span className="w-8 text-right font-bold text-amber-600 dark:text-amber-400 text-sm sm:text-base">{striker?.runs ?? 0}</span>
-              <span className="w-8 text-right text-slate-600 dark:text-slate-300 font-semibold">{striker?.balls ?? 0}</span>
-              <span className="w-12 text-right text-cyan-700 dark:text-cyan-300 font-semibold">{strikerSr}</span>
+            <div className="flex items-center font-score tabular-nums flex-shrink-0">
+              <div className="w-9 sm:w-11 text-center border-l border-slate-200 dark:border-[#1c2d4a] py-0.5">
+                <span className="font-bold text-sm sm:text-base text-orange-500 dark:text-orange-400">
+                  {striker?.runs ?? 0}
+                </span>
+              </div>
+              <div className="w-9 sm:w-11 text-center border-l border-slate-200 dark:border-[#1c2d4a] py-0.5">
+                <span className="font-bold text-xs sm:text-sm text-slate-900 dark:text-white">
+                  {striker?.balls ?? 0}
+                </span>
+              </div>
+              <div className="w-12 sm:w-15 text-center border-l border-slate-200 dark:border-[#1c2d4a] py-0.5">
+                <span className="font-bold text-xs sm:text-sm text-cyan-600 dark:text-cyan-400">
+                  {strikerSr}
+                </span>
+              </div>
             </div>
           </div>
 
           {/* Non-Striker */}
-          <div className="flex items-center justify-between px-2.5 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700/60">
-            <div className="flex items-center gap-1.5 min-w-0 pr-2">
-              <span className="w-4.5 h-4.5 flex-shrink-0 inline-block" aria-hidden="true" />
-              <span className="font-medium text-sm text-slate-700 dark:text-slate-200 truncate uppercase tracking-tight">
+          <div className="flex items-center justify-between px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-full border border-slate-300/80 dark:border-[#1c2d4a] bg-slate-50/70 dark:bg-[#070e1c]/60 transition-all">
+            <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 pr-1 sm:pr-2">
+              <PlayerAvatar
+                key={nonStriker?.id || nonStriker?.player_id || nonStriker?.name || 'non_striker'}
+                player={nonStriker}
+                photoUrl={nonStriker?.photo_url}
+                name={nonStriker?.name}
+                size="sm"
+                className="w-7 h-7 sm:w-8 sm:h-8 border-[1.5px] border-cyan-400 dark:border-cyan-400 shadow-2xs flex-shrink-0"
+              />
+              <span className="font-bold text-xs sm:text-sm text-slate-800 dark:text-white truncate uppercase tracking-tight">
                 {nonStriker?.name || 'Non-Striker'}
               </span>
               <button
                 type="button"
                 onClick={() => onEditPlayer('non_striker', nonStriker?.name || 'Non-Striker')}
-                className="p-0.5 text-slate-400 hover:text-slate-700 dark:hover:text-white transition-colors cursor-pointer"
+                className="p-0.5 text-cyan-600 dark:text-cyan-400 hover:text-cyan-800 dark:hover:text-cyan-300 transition-colors flex-shrink-0 cursor-pointer"
                 title="Edit non-striker name"
               >
-                <Edit2 className="w-3 h-3" />
+                <Edit2 className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
               </button>
             </div>
-            <div className="flex items-center gap-4 font-score text-xs flex-shrink-0 tabular-nums">
-              <span className="w-8 text-right font-bold text-slate-800 dark:text-white text-sm sm:text-base">{nonStriker?.runs ?? 0}</span>
-              <span className="w-8 text-right text-slate-500 dark:text-slate-400 font-normal">{nonStriker?.balls ?? 0}</span>
-              <span className="w-12 text-right text-slate-600 dark:text-slate-300 font-normal">{nonStrikerSr}</span>
+            <div className="flex items-center font-score tabular-nums flex-shrink-0">
+              <div className="w-9 sm:w-11 text-center border-l border-slate-200 dark:border-[#1c2d4a] py-0.5">
+                <span className="font-bold text-xs sm:text-sm text-slate-900 dark:text-white">
+                  {nonStriker?.runs ?? 0}
+                </span>
+              </div>
+              <div className="w-9 sm:w-11 text-center border-l border-slate-200 dark:border-[#1c2d4a] py-0.5">
+                <span className="font-bold text-xs sm:text-sm text-slate-900 dark:text-white">
+                  {nonStriker?.balls ?? 0}
+                </span>
+              </div>
+              <div className="w-12 sm:w-15 text-center border-l border-slate-200 dark:border-[#1c2d4a] py-0.5">
+                <span className="font-bold text-xs sm:text-sm text-cyan-600 dark:text-cyan-400">
+                  {nonStrikerSr}
+                </span>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Bottom: Active Bowler & Figures */}
-        <div className="pt-2 flex items-center justify-between gap-2">
-          <div className="flex items-center gap-1.5 min-w-0">
-            <span className="text-[10px] text-cyan-700 dark:text-cyan-300 uppercase font-semibold tracking-wider font-sans">
+        {/* Clean horizontal divider before Bowler */}
+        <div className="border-t border-slate-200 dark:border-[#13233c] my-2 sm:my-2.5" />
+
+        {/* Bowler Section */}
+        <div className="flex items-center justify-between gap-2 px-1">
+          <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 pr-1 sm:pr-2">
+            <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-cyan-600 dark:text-cyan-400 font-sans flex-shrink-0">
               BOWLER:
             </span>
-            <span className="font-semibold text-sm text-slate-900 dark:text-white truncate max-w-[150px] sm:max-w-[200px] uppercase tracking-tight">
+            <PlayerAvatar
+              key={bowler?.id || bowler?.player_id || bowler?.name || 'bowler'}
+              player={bowler}
+              photoUrl={bowler?.photo_url}
+              name={bowler?.name}
+              size="sm"
+              className="w-7 h-7 sm:w-8 sm:h-8 border-[1.5px] border-cyan-400 dark:border-cyan-400 shadow-2xs flex-shrink-0"
+            />
+            <span className="font-bold text-xs sm:text-sm text-slate-900 dark:text-white truncate uppercase tracking-tight">
               {bowler?.name || 'Bowler'}
             </span>
             <button
               type="button"
               onClick={() => onEditPlayer('bowler', bowler?.name || 'Bowler')}
-              className="p-0.5 text-cyan-600 dark:text-cyan-400 hover:text-cyan-800 dark:hover:text-white transition-colors cursor-pointer"
+              className="p-0.5 text-cyan-600 dark:text-cyan-400 hover:text-cyan-800 dark:hover:text-cyan-300 transition-colors flex-shrink-0 cursor-pointer"
               title="Edit bowler name"
             >
-              <Edit2 className="w-3 h-3" />
+              <Edit2 className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
             </button>
           </div>
 
-          <div className="bg-slate-100 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-700 px-2.5 py-1 rounded-lg text-xs font-score tabular-nums flex items-center gap-1 shadow-2xs">
-            <span className="font-bold text-amber-600 dark:text-amber-300 text-sm sm:text-base">{bowler?.wickets ?? 0}</span>
-            <span className="text-slate-400 dark:text-white/60 font-sans">-</span>
-            <span className="font-bold text-slate-900 dark:text-white text-sm sm:text-base">{bowler?.runs ?? 0}</span>
-            <span className="text-slate-500 dark:text-slate-400 ml-1.5 font-score font-semibold text-xs">({bowler?.overs ?? '0.0'} ov)</span>
+          <div className="rounded-full border border-slate-300/80 dark:border-[#1c2d4a] bg-slate-100/90 dark:bg-[#071122]/90 px-2.5 sm:px-3 py-1 text-xs font-score tabular-nums flex items-center shadow-2xs flex-shrink-0">
+            <span className="font-bold text-orange-500 dark:text-orange-400 text-xs sm:text-sm">
+              {bowler?.wickets ?? 0}
+            </span>
+            <span className="text-slate-400 dark:text-white/70 mx-1 font-sans font-medium">
+              -
+            </span>
+            <span className="font-bold text-slate-900 dark:text-white text-xs sm:text-sm">
+              {bowler?.runs ?? 0}
+            </span>
+            <span className="text-slate-500 dark:text-slate-400 font-medium text-[11px] sm:text-xs ml-1">
+              ({bowler?.overs ?? '0.0'} ov)
+            </span>
           </div>
         </div>
       </div>
@@ -392,7 +459,7 @@ export default function Scoreboard({
             <button
               type="button"
               onClick={() => setShowHistoryModal(false)}
-              className="w-full mt-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-bold text-xs border border-slate-300 dark:border-slate-700 cursor-pointer"
+              className="ms-btn ms-btn-outline ms-btn-sm w-full mt-3 cursor-pointer"
             >
               Close
             </button>

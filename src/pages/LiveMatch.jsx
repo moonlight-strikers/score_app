@@ -3,9 +3,11 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import Scoreboard from '../components/Scoreboard';
 import ScoringPad from '../components/ScoringPad';
 import Scorecard from '../components/Scorecard';
+import PlayerSelector from '../components/PlayerSelector';
 import { matchService } from '../services/matchService';
 import { scoringService } from '../services/scoringService';
 import { inningsService } from '../services/inningsService';
+import { playerService } from '../services/playerService';
 import { supabase, isSupabaseConfigured } from '../services/supabase';
 import { BALL_TYPES, isLegalDelivery, isWideDelivery, isNoBallDelivery, formatOvers } from '../utils/cricketRules';
 import {
@@ -28,10 +30,12 @@ import {
   Undo2
 } from 'lucide-react';
 import { shareMatchResult } from '../utils/shareMatch';
+import { useAdmin } from '../contexts/AdminContext';
 
 export default function LiveMatch() {
   const { matchId } = useParams();
   const navigate = useNavigate();
+  const { isAdmin, adminToken } = useAdmin();
 
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('live'); // 'live' | 'scorecard'
@@ -82,21 +86,26 @@ export default function LiveMatch() {
   // Change bowler dialog
   const [showBowlerModal, setShowBowlerModal] = useState(false);
   const [newBowlerName, setNewBowlerName] = useState('');
+  const [newBowlerId, setNewBowlerId] = useState('');
 
   // End innings dialog & next innings opening players
   const [showEndInningsModal, setShowEndInningsModal] = useState(false);
   const [nextInningsBattingChoice, setNextInningsBattingChoice] = useState(null); // 'normal' | 'follow_on'
   const [secondInningsForm, setSecondInningsForm] = useState({
     striker: '',
+    strikerId: '',
     nonStriker: '',
-    bowler: ''
+    nonStrikerId: '',
+    bowler: '',
+    bowlerId: ''
   });
 
   // Edit player name dialog (on the fly while playing)
   const [editPlayerModal, setEditPlayerModal] = useState({
     isOpen: false,
     role: '', // 'striker' | 'non_striker' | 'bowler'
-    name: ''
+    name: '',
+    playerId: ''
   });
 
   const handleToggleHoldMatch = async () => {
@@ -144,7 +153,7 @@ export default function LiveMatch() {
     setShowActionsModal(false);
     setIsSaving(true);
     try {
-      await matchService.deleteMatch(matchData.id);
+      await matchService.deleteMatch(matchData.id, adminToken);
       navigate('/matches');
     } catch (err) {
       console.error('Error deleting match:', err);
@@ -414,6 +423,50 @@ export default function LiveMatch() {
     setHistoryStack((prev) => [JSON.parse(JSON.stringify(matchData)), ...prev.slice(0, 30)]);
   };
 
+  // Helper to resolve complete player metadata (id, player_id, photo_url) across crease snapshots, history, match data, and cache
+  const resolvePlayerMetadata = (playerName, fallbackCandidates = []) => {
+    if (!playerName) return null;
+    const clean = String(playerName).trim().toUpperCase();
+
+    // 1. Check fallback candidate objects (crease.savedCrease, historyStack[0], matchData)
+    for (const cand of fallbackCandidates) {
+      if (!cand) continue;
+      const cName = (cand.name || cand.full_name || '').trim().toUpperCase();
+      if (cName === clean) {
+        if (cand.photo_url || cand.id || cand.player_id) {
+          return cand;
+        }
+      }
+    }
+
+    // 2. Search matchData innings_data batters and bowlers
+    if (Array.isArray(matchData?.innings_data)) {
+      for (const inn of matchData.innings_data) {
+        const foundB = (inn.batters || []).find(b => (b.name || '').trim().toUpperCase() === clean);
+        if (foundB && (foundB.photo_url || foundB.id || foundB.player_id)) {
+          return foundB;
+        }
+        const foundBw = (inn.bowlers || []).find(bw => (bw.name || '').trim().toUpperCase() === clean);
+        if (foundBw && (foundBw.photo_url || foundBw.id || foundBw.player_id)) {
+          return foundBw;
+        }
+      }
+    }
+
+    // 3. Search playerService cache
+    const fromService = playerService.findPlayer(clean);
+    if (fromService) {
+      return {
+        id: fromService.id,
+        player_id: fromService.player_id,
+        name: fromService.full_name || fromService.name || clean,
+        photo_url: fromService.photo_url || null
+      };
+    }
+
+    return null;
+  };
+
   const handleScoreBall = async ({ runs, type, batsmanRuns = 0, isFour = false, isSix = false }) => {
     if (isOperationBusyRef.current || isUndoing || isSaving) {
       console.warn('[ScoringDebug] Scoring blocked: another operation is in flight');
@@ -556,6 +609,7 @@ export default function LiveMatch() {
         winnerTeam = currentBattingTeam;
         matchResult = `${currentBattingTeam} scored ${newTotalRuns}/${currentWickets} in ${newOversStr} ov.`;
       } else if (currentInnNum < maxConfiguredInnings && (newLegalBalls >= (oversPerInnings * 6) || currentWickets >= 10)) {
+        setShowBowlerModal(false);
         setShowEndInningsModal(true);
       }
     } else {
@@ -578,6 +632,7 @@ export default function LiveMatch() {
           }
         }
       } else if (isFirstInnings && (newLegalBalls >= (oversPerInnings * 6) || currentWickets >= 10)) {
+        setShowBowlerModal(false);
         setShowEndInningsModal(true);
       }
     }
@@ -681,7 +736,12 @@ export default function LiveMatch() {
 
     setMatchData(nextMatchData);
 
-    if (isOverFinished && newStatus !== 'completed') {
+    const isInningsOver = (
+      newStatus === 'completed' ||
+      (currentInnNum < maxConfiguredInnings && (newLegalBalls >= (oversPerInnings * 6) || newWickets >= 10))
+    );
+
+    if (isOverFinished && !isInningsOver) {
       setShowBowlerModal(true);
     }
 
@@ -716,7 +776,7 @@ export default function LiveMatch() {
     });
   };
 
-  const handleWicket = async ({ wicketType, isStriker, newBatter, fielder }) => {
+  const handleWicket = async ({ wicketType, isStriker, newBatter, newBatterId, fielder }) => {
     if (isOperationBusyRef.current || isSaving || isUndoing) return;
     setErrorMessage(null);
 
@@ -724,8 +784,12 @@ export default function LiveMatch() {
     const newLegalBalls = currentLegalBalls + 1;
     const newOversStr = formatOvers(newLegalBalls);
 
+    const foundNewBatter = playerService.findPlayer(newBatterId || newBatter);
     const newBatterObj = {
-      name: newBatter?.trim() || `Batter ${newWickets + 2}`,
+      id: foundNewBatter?.id || newBatterId || '',
+      name: (newBatter?.trim() || `Batter ${newWickets + 2}`).toUpperCase(),
+      player_id: foundNewBatter?.player_id || newBatterId || '',
+      photo_url: foundNewBatter?.photo_url || null,
       runs: 0,
       balls: 0,
       fours: 0,
@@ -812,6 +876,7 @@ export default function LiveMatch() {
         winnerTeam = currentBattingTeam;
         matchResult = `${currentBattingTeam} scored ${currentRuns}/${newWickets} in ${newOversStr} ov.`;
       } else if (currentInnNum < maxConfiguredInnings && newWickets >= 10) {
+        setShowBowlerModal(false);
         setShowEndInningsModal(true);
       }
     } else {
@@ -822,6 +887,7 @@ export default function LiveMatch() {
         winnerTeam = diff > 0 ? currentBowlingTeam : 'Tie';
         matchResult = diff > 0 ? `${currentBowlingTeam} won by ${diff} runs!` : 'Match Tied!';
       } else if (isFirstInnings && newWickets >= 10) {
+        setShowBowlerModal(false);
         setShowEndInningsModal(true);
       }
     }
@@ -946,7 +1012,12 @@ export default function LiveMatch() {
 
     setMatchData(nextMatchData);
 
-    if (isOverFinished && newStatus !== 'completed') {
+    const isInningsOver = (
+      newStatus === 'completed' ||
+      (currentInnNum < maxConfiguredInnings && (newLegalBalls >= (oversPerInnings * 6) || newWickets >= 10))
+    );
+
+    if (isOverFinished && !isInningsOver) {
       setShowBowlerModal(true);
     }
 
@@ -1044,38 +1115,78 @@ export default function LiveMatch() {
         removedBall
       );
 
-      // Resolve striker stats
+      const previousSnapshot = historyStack.length > 0 ? historyStack[0] : null;
+
+      // Resolve striker metadata & stats preserving complete player object & profile photo
+      const strikerMeta = resolvePlayerMetadata(crease.strikerName, [
+        crease.savedCrease?.striker,
+        crease.savedCrease?.non_striker,
+        previousSnapshot?.striker,
+        previousSnapshot?.non_striker,
+        matchData.striker,
+        matchData.non_striker
+      ]);
+
       const strikerStat = stats.batters.find(b => b.name === crease.strikerName);
       const restoredStriker = {
+        ...(strikerMeta || {}),
         name: crease.strikerName,
-        runs: strikerStat?.runs || 0,
-        balls: strikerStat?.balls || 0,
-        fours: strikerStat?.fours || 0,
-        sixes: strikerStat?.sixes || 0,
+        id: strikerMeta?.id || strikerMeta?.player_id || '',
+        player_id: strikerMeta?.player_id || '',
+        photo_url: strikerMeta?.photo_url || null,
+        runs: strikerStat?.runs ?? (crease.savedCrease?.striker?.name === crease.strikerName ? crease.savedCrease.striker.runs : 0),
+        balls: strikerStat?.balls ?? (crease.savedCrease?.striker?.name === crease.strikerName ? crease.savedCrease.striker.balls : 0),
+        fours: strikerStat?.fours ?? (crease.savedCrease?.striker?.name === crease.strikerName ? crease.savedCrease.striker.fours : 0),
+        sixes: strikerStat?.sixes ?? (crease.savedCrease?.striker?.name === crease.strikerName ? crease.savedCrease.striker.sixes : 0),
+        strikeRate: (strikerStat?.balls || 0) > 0 ? ((strikerStat.runs / strikerStat.balls) * 100).toFixed(1) : '0.0',
         notOut: true
       };
 
-      // Resolve non-striker stats
+      // Resolve non-striker metadata & stats preserving complete player object & profile photo
+      const nonStrikerMeta = resolvePlayerMetadata(crease.nonStrikerName, [
+        crease.savedCrease?.non_striker,
+        crease.savedCrease?.striker,
+        previousSnapshot?.non_striker,
+        previousSnapshot?.striker,
+        matchData.non_striker,
+        matchData.striker
+      ]);
+
       const nonStrikerStat = stats.batters.find(b => b.name === crease.nonStrikerName);
       const restoredNonStriker = {
+        ...(nonStrikerMeta || {}),
         name: crease.nonStrikerName,
-        runs: nonStrikerStat?.runs || 0,
-        balls: nonStrikerStat?.balls || 0,
-        fours: nonStrikerStat?.fours || 0,
-        sixes: nonStrikerStat?.sixes || 0,
+        id: nonStrikerMeta?.id || nonStrikerMeta?.player_id || '',
+        player_id: nonStrikerMeta?.player_id || '',
+        photo_url: nonStrikerMeta?.photo_url || null,
+        runs: nonStrikerStat?.runs ?? (crease.savedCrease?.non_striker?.name === crease.nonStrikerName ? crease.savedCrease.non_striker.runs : 0),
+        balls: nonStrikerStat?.balls ?? (crease.savedCrease?.non_striker?.name === crease.nonStrikerName ? crease.savedCrease.non_striker.balls : 0),
+        fours: nonStrikerStat?.fours ?? (crease.savedCrease?.non_striker?.name === crease.nonStrikerName ? crease.savedCrease.non_striker.fours : 0),
+        sixes: nonStrikerStat?.sixes ?? (crease.savedCrease?.non_striker?.name === crease.nonStrikerName ? crease.savedCrease.non_striker.sixes : 0),
+        strikeRate: (nonStrikerStat?.balls || 0) > 0 ? ((nonStrikerStat.runs / nonStrikerStat.balls) * 100).toFixed(1) : '0.0',
         notOut: true
       };
 
-      // Resolve bowler stats
+      // Resolve bowler metadata & stats preserving complete player object & profile photo
+      const bowlerMeta = resolvePlayerMetadata(crease.bowlerName, [
+        crease.savedCrease?.bowler,
+        previousSnapshot?.bowler,
+        matchData.bowler
+      ]);
+
       const bowlerStat = stats.bowlers.find(bw => bw.name === crease.bowlerName);
       const restoredBowler = {
+        ...(bowlerMeta || {}),
         name: crease.bowlerName,
-        overs: bowlerStat?.overs || '0.0',
-        runs: bowlerStat?.runs || 0,
-        wickets: bowlerStat?.wickets || 0,
-        economy: bowlerStat?.economy || '0.00',
-        maidens: bowlerStat?.maidens || 0,
-        ballsCount: bowlerStat?.ballsCount || 0
+        id: bowlerMeta?.id || bowlerMeta?.player_id || '',
+        player_id: bowlerMeta?.player_id || '',
+        photo_url: bowlerMeta?.photo_url || null,
+        overs: bowlerStat?.overs ?? (crease.savedCrease?.bowler?.name === crease.bowlerName ? crease.savedCrease.bowler.overs : '0.0'),
+        runs: bowlerStat?.runs ?? (crease.savedCrease?.bowler?.name === crease.bowlerName ? crease.savedCrease.bowler.runs : 0),
+        wickets: bowlerStat?.wickets ?? (crease.savedCrease?.bowler?.name === crease.bowlerName ? crease.savedCrease.bowler.wickets : 0),
+        economy: bowlerStat?.economy ?? (crease.savedCrease?.bowler?.name === crease.bowlerName ? crease.savedCrease.bowler.economy : '0.00'),
+        maidens: bowlerStat?.maidens ?? (crease.savedCrease?.bowler?.name === crease.bowlerName ? crease.savedCrease.bowler.maidens : 0),
+        ballsCount: bowlerStat?.ballsCount ?? (crease.savedCrease?.bowler?.name === crease.bowlerName ? crease.savedCrease.bowler.ballsCount : 0)
       };
 
       // 4. Revert Match Completion if criteria no longer met
@@ -1119,11 +1230,37 @@ export default function LiveMatch() {
       setShowBowlerModal(false);
       setShowEndInningsModal(false);
 
-      // 6. Reconcile innings_data for scorecard tab
+      // 6. Reconcile innings_data for scorecard tab while preserving complete player profiles
       const existingInningsList = Array.isArray(matchData.innings_data) ? [...matchData.innings_data] : [];
       const innIdx = existingInningsList.findIndex((inn) => inn.innings_number === currentInn);
       const currentBatTeam = existingInningsList[innIdx]?.batting_team || existingInningsList[innIdx]?.team_name || (isFirst ? (matchData.current_batting_team || matchData.team_a_name) : (matchData.current_batting_team || matchData.team_b_name));
       const currentInningsId = existingInningsList[innIdx]?.id || currentInnData?.id;
+
+      const reconciledBattersAfterUndo = (stats.batters || []).map((b) => {
+        const existing = (existingInningsList[innIdx]?.batters || []).find((eb) => eb.name === b.name);
+        const meta = resolvePlayerMetadata(b.name, [existing, restoredStriker, restoredNonStriker]);
+        return {
+          ...(existing || {}),
+          ...(meta || {}),
+          ...b,
+          id: existing?.id || meta?.id || b.player_id || '',
+          player_id: existing?.player_id || meta?.player_id || '',
+          photo_url: existing?.photo_url || meta?.photo_url || null
+        };
+      });
+
+      const reconciledBowlersAfterUndo = (stats.bowlers || []).map((bw) => {
+        const existing = (existingInningsList[innIdx]?.bowlers || []).find((ebw) => ebw.name === bw.name);
+        const meta = resolvePlayerMetadata(bw.name, [existing, restoredBowler]);
+        return {
+          ...(existing || {}),
+          ...(meta || {}),
+          ...bw,
+          id: existing?.id || meta?.id || bw.player_id || '',
+          player_id: existing?.player_id || meta?.player_id || '',
+          photo_url: existing?.photo_url || meta?.photo_url || null
+        };
+      });
 
       const updatedInningsObj = {
         ...(existingInningsList[innIdx] || {}),
@@ -1139,8 +1276,8 @@ export default function LiveMatch() {
         overs_completed: Math.floor(stats.legalBalls / 6),
         balls_completed: stats.legalBalls,
         innings_status: 'live',
-        batters: stats.batters,
-        bowlers: stats.bowlers,
+        batters: reconciledBattersAfterUndo,
+        bowlers: reconciledBowlersAfterUndo,
         extras: stats.extras,
         fall_of_wickets: stats.fallOfWickets
       };
@@ -1209,6 +1346,7 @@ export default function LiveMatch() {
   };
 
   const handleSwapStrike = async () => {
+    pushHistory();
     setMatchData((prev) => {
       const swapped = {
         ...prev,
@@ -1220,42 +1358,108 @@ export default function LiveMatch() {
     });
   };
 
-  const handleChangeBowlerConfirm = async () => {
-    const clean = newBowlerName.trim().toUpperCase();
+  const applySelectedBowler = async (cleanName, bowlerPlayerId = '') => {
+    const clean = cleanName?.trim()?.toUpperCase();
     if (!clean) return;
 
-    setMatchData((prev) => {
-      const updatedHistory = Array.from(new Set([
-        ...(prev.bowlers_history || []),
-        prev.bowler?.name,
-        clean
-      ].filter(Boolean)));
+    // Rule check: Cannot be active batsman
+    const strikerName = matchData?.striker?.name?.trim()?.toUpperCase();
+    const nonStrikerName = matchData?.non_striker?.name?.trim()?.toUpperCase();
+    if (clean === strikerName || clean === nonStrikerName) {
+      alert(`${clean} is currently batting and cannot bowl.`);
+      return;
+    }
 
-      const updated = {
-        ...prev,
-        bowlers_history: updatedHistory,
-        bowler: {
-          name: clean,
-          overs: '0.0',
-          maidens: 0,
-          runs: 0,
-          wickets: 0,
-          economy: '0.00'
-        }
+    // Rule check: Cannot bowl consecutive overs
+    const lastOverBowler = (
+      matchData.completed_overs && matchData.completed_overs.length > 0
+        ? matchData.completed_overs[matchData.completed_overs.length - 1]?.bowler
+        : null
+    )?.trim()?.toUpperCase();
+
+    if (lastOverBowler && clean === lastOverBowler) {
+      alert(`${clean} just bowled the previous over. Bowlers cannot bowl two consecutive overs.`);
+      return;
+    }
+
+    const foundBowler = playerService.findPlayer(bowlerPlayerId || clean);
+
+    // Look for previous stats in current innings to preserve overs, wickets, runs
+    const currentInnNum = matchData.current_innings || 1;
+    const existingInningsList = [...(matchData.innings_data || [])];
+    const innIdx = existingInningsList.findIndex(
+      (inn) => inn.innings_number === currentInnNum
+    );
+    const existingInnBowlers = innIdx >= 0 ? (existingInningsList[innIdx]?.bowlers || []) : [];
+    const prevBowlerStats = existingInnBowlers.find(
+      (b) => b.name?.trim()?.toUpperCase() === clean
+    );
+
+    const updatedBowlerObj = {
+      id: foundBowler?.id || bowlerPlayerId || prevBowlerStats?.id || '',
+      name: clean,
+      player_id: foundBowler?.player_id || bowlerPlayerId || prevBowlerStats?.player_id || '',
+      photo_url: foundBowler?.photo_url || prevBowlerStats?.photo_url || null,
+      overs: prevBowlerStats?.overs || '0.0',
+      maidens: prevBowlerStats?.maidens || 0,
+      runs: prevBowlerStats?.runs || 0,
+      wickets: prevBowlerStats?.wickets || 0,
+      economy: prevBowlerStats?.economy || '0.00'
+    };
+
+    pushHistory();
+
+    const updatedHistory = Array.from(new Set([
+      ...(matchData.bowlers_history || []),
+      clean
+    ].filter(Boolean)));
+
+    if (innIdx >= 0) {
+      const filtered = existingInnBowlers.filter(b => b.name?.trim()?.toUpperCase() !== clean);
+      existingInningsList[innIdx] = {
+        ...existingInningsList[innIdx],
+        bowlers: [...filtered, updatedBowlerObj]
       };
-      matchService.updateMatch(prev.id, updated).catch(console.warn);
-      return updated;
-    });
+    }
+
+    const nextState = {
+      ...matchData,
+      bowlers_history: updatedHistory,
+      bowler: updatedBowlerObj,
+      innings_data: existingInningsList
+    };
+
+    setMatchData(nextState);
     setNewBowlerName('');
+    setNewBowlerId('');
     setShowBowlerModal(false);
+
+    try {
+      await matchService.updateMatch(matchData.id, nextState);
+    } catch (err) {
+      console.warn('Failed to update bowler in database:', err);
+    }
+  };
+
+  const handleSelectPreviousBowler = async (bName) => {
+    await applySelectedBowler(bName);
+  };
+
+  const handleChangeBowlerConfirm = async () => {
+    await applySelectedBowler(newBowlerName, newBowlerId);
   };
 
   // Open Edit Player Name dialog
   const handleOpenEditPlayer = (role, currentName) => {
+    const currentPlayer = role === 'striker'
+      ? matchData?.striker
+      : (role === 'non_striker' ? matchData?.non_striker : matchData?.bowler);
+
     setEditPlayerModal({
       isOpen: true,
       role,
-      name: currentName || ''
+      name: currentName || '',
+      playerId: currentPlayer?.player_id || ''
     });
   };
 
@@ -1264,31 +1468,37 @@ export default function LiveMatch() {
     const clean = editPlayerModal.name.trim().toUpperCase();
     if (!clean) return;
 
+    pushHistory();
+    const foundEdited = playerService.findPlayer(editPlayerModal.playerId || clean);
+
     setMatchData((prev) => {
       const updated = { ...prev };
       const oldName = editPlayerModal.role === 'striker'
         ? prev.striker?.name
         : (editPlayerModal.role === 'non_striker' ? prev.non_striker?.name : prev.bowler?.name);
+      const newPlayerId = editPlayerModal.playerId || '';
+      const photo = foundEdited?.photo_url || prev[editPlayerModal.role]?.photo_url || null;
+      const pid = foundEdited?.id || prev[editPlayerModal.role]?.id || '';
 
       if (editPlayerModal.role === 'striker') {
-        updated.striker = { ...updated.striker, name: clean };
+        updated.striker = { ...updated.striker, name: clean, player_id: newPlayerId || updated.striker?.player_id || '', photo_url: photo, id: pid };
       } else if (editPlayerModal.role === 'non_striker') {
-        updated.non_striker = { ...updated.non_striker, name: clean };
+        updated.non_striker = { ...updated.non_striker, name: clean, player_id: newPlayerId || updated.non_striker?.player_id || '', photo_url: photo, id: pid };
       } else if (editPlayerModal.role === 'bowler') {
-        updated.bowler = { ...updated.bowler, name: clean };
+        updated.bowler = { ...updated.bowler, name: clean, player_id: newPlayerId || updated.bowler?.player_id || '', photo_url: photo, id: pid };
         updated.bowlers_history = Array.from(new Set([
           ...(prev.bowlers_history || []).map(n => n === oldName ? clean : n),
           clean
         ]));
       }
 
-      // Also update name in innings_data if present
+      // Also update name and player_id in innings_data if present
       if (oldName && updated.innings_data) {
         const curInn = updated.current_innings || 1;
         updated.innings_data = updated.innings_data.map(inn => {
           if (inn.innings_number === curInn) {
-            const updatedBatters = (inn.batters || []).map(b => b.name === oldName ? { ...b, name: clean } : b);
-            const updatedBowlers = (inn.bowlers || []).map(bw => bw.name === oldName ? { ...bw, name: clean } : bw);
+            const updatedBatters = (inn.batters || []).map(b => b.name === oldName ? { ...b, name: clean, player_id: newPlayerId || b.player_id || '', photo_url: photo || b.photo_url || null } : b);
+            const updatedBowlers = (inn.bowlers || []).map(bw => bw.name === oldName ? { ...bw, name: clean, player_id: newPlayerId || bw.player_id || '', photo_url: photo || bw.photo_url || null } : bw);
             return { ...inn, batters: updatedBatters, bowlers: updatedBowlers };
           }
           return inn;
@@ -1299,11 +1509,44 @@ export default function LiveMatch() {
       return updated;
     });
 
-    setEditPlayerModal({ isOpen: false, role: '', name: '' });
+    setEditPlayerModal({ isOpen: false, role: '', name: '', playerId: '' });
   };
 
   const handleStartNextInnings = async (e) => {
     if (e && e.preventDefault) e.preventDefault();
+
+    if (!secondInningsForm.striker || !secondInningsForm.strikerId) {
+      alert('Please search and select a registered Opening Striker.');
+      return;
+    }
+    if (!secondInningsForm.nonStriker || !secondInningsForm.nonStrikerId) {
+      alert('Please search and select a registered Opening Non-Striker.');
+      return;
+    }
+    if (!secondInningsForm.bowler || !secondInningsForm.bowlerId) {
+      alert('Please search and select a registered Opening Bowler.');
+      return;
+    }
+
+    // 3-way duplicate opening player validation
+    const sId = secondInningsForm.strikerUuid || secondInningsForm.strikerId;
+    const nsId = secondInningsForm.nonStrikerUuid || secondInningsForm.nonStrikerId;
+    const bId = secondInningsForm.bowlerUuid || secondInningsForm.bowlerId;
+    const sName = (secondInningsForm.striker || '').trim().toLowerCase();
+    const nsName = (secondInningsForm.nonStriker || '').trim().toLowerCase();
+    const bName = (secondInningsForm.bowler || '').trim().toLowerCase();
+
+    if (
+      sId === nsId ||
+      sId === bId ||
+      nsId === bId ||
+      sName === nsName ||
+      sName === bName ||
+      nsName === bName
+    ) {
+      alert('Each opening position must have a different player. Please select another player.');
+      return;
+    }
 
     const currentInn = matchData.current_innings || 1;
     const nextInnNumber = currentInn + 1;
@@ -1321,9 +1564,39 @@ export default function LiveMatch() {
       nextBowling = currentBowlingTeam;
     }
 
-    const newStriker = { name: strikerName, runs: 0, balls: 0, fours: 0, sixes: 0, notOut: true };
-    const newNonStriker = { name: nonStrikerName, runs: 0, balls: 0, fours: 0, sixes: 0, notOut: true };
-    const newBowler = { name: bowlerName, overs: '0.0', maidens: 0, runs: 0, wickets: 0, economy: '0.00' };
+    const newStriker = {
+      id: secondInningsForm.strikerUuid || '',
+      name: strikerName,
+      player_id: secondInningsForm.strikerId || '',
+      photo_url: secondInningsForm.strikerPhoto || null,
+      runs: 0,
+      balls: 0,
+      fours: 0,
+      sixes: 0,
+      notOut: true
+    };
+    const newNonStriker = {
+      id: secondInningsForm.nonStrikerUuid || '',
+      name: nonStrikerName,
+      player_id: secondInningsForm.nonStrikerId || '',
+      photo_url: secondInningsForm.nonStrikerPhoto || null,
+      runs: 0,
+      balls: 0,
+      fours: 0,
+      sixes: 0,
+      notOut: true
+    };
+    const newBowler = {
+      id: secondInningsForm.bowlerUuid || '',
+      name: bowlerName,
+      player_id: secondInningsForm.bowlerId || '',
+      photo_url: secondInningsForm.bowlerPhoto || null,
+      overs: '0.0',
+      maidens: 0,
+      runs: 0,
+      wickets: 0,
+      economy: '0.00'
+    };
 
     const existingInningsList = [...(matchData.innings_data || [])];
 
@@ -1426,6 +1699,9 @@ export default function LiveMatch() {
 
     setMatchData(nextState);
     setShowEndInningsModal(false);
+    setShowBowlerModal(false);
+    setNewBowlerName('');
+    setNewBowlerId('');
     setNextInningsBattingChoice(null);
     setSecondInningsForm({ striker: '', nonStriker: '', bowler: '' });
 
@@ -1471,13 +1747,27 @@ export default function LiveMatch() {
   const currentInningsData = matchData.innings_data?.find(
     (inn) => inn.innings_number === (matchData.current_innings || 1)
   );
+
+  // Bowler who bowled the immediate previous over in this innings cannot bowl consecutive overs
+  const lastOverBowlerName = (
+    matchData.completed_overs && matchData.completed_overs.length > 0
+      ? matchData.completed_overs[matchData.completed_overs.length - 1]?.bowler
+      : null
+  )?.trim()?.toUpperCase();
+
   const previousBowlers = Array.from(new Set([
     ...(matchData.bowlers_history || []),
     ...(matchData.completed_overs || []).map((o) => o.bowler),
-    matchData.bowler?.name,
     matchData.opening_bowler_name,
     ...(currentInningsData?.bowlers || []).map((b) => b.name)
-  ].map((n) => n?.trim()).filter(Boolean)));
+  ].map((n) => n?.trim()).filter(Boolean)))
+    // Filter out active striker and non-striker
+    .filter((n) => {
+      const up = n.toUpperCase();
+      const sUp = matchData.striker?.name?.trim()?.toUpperCase();
+      const nsUp = matchData.non_striker?.name?.trim()?.toUpperCase();
+      return up !== sUp && up !== nsUp;
+    });
 
   return (
     <div className="ms-scoring-screen">
@@ -1664,7 +1954,10 @@ export default function LiveMatch() {
               onUndo={handleUndo}
               onSwapStrike={handleSwapStrike}
               onChangeBowler={() => setShowBowlerModal(true)}
-              onEndInnings={(currentInnNum < maxConfiguredInnings) ? () => setShowEndInningsModal(true) : null}
+              onEndInnings={(currentInnNum < maxConfiguredInnings) ? () => {
+                setShowBowlerModal(false);
+                setShowEndInningsModal(true);
+              } : null}
               canUndo={canPerformUndo}
               isUndoing={isUndoing}
               strikerName={matchData.striker?.name}
@@ -1718,7 +2011,7 @@ export default function LiveMatch() {
       {/* Change Bowler Dialog Modal */}
       {showBowlerModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs animate-fadeIn">
-          <div className="ms-card p-5 max-w-sm w-full bg-ms-bg-card border-ms-border shadow-2xl rounded-2xl">
+          <div className="ms-card p-5 max-w-sm w-full bg-ms-bg-card border-ms-border shadow-2xl rounded-2xl overflow-visible">
             <h3 className="text-base font-black text-ms-text-primary mb-3 flex items-center gap-2">
               <RotateCw className="w-4 h-4 text-ms-cyan" />
               <span>Select Next Bowler</span>
@@ -1727,43 +2020,51 @@ export default function LiveMatch() {
             {/* Quick 1-Tap Chips of Previous Bowlers */}
             {previousBowlers.length > 0 && (
               <div className="mb-3">
-                <div className="text-[10px] font-bold text-ms-text-muted uppercase tracking-wider mb-1.5">
-                  Previous Bowlers in this match
+                <div className="text-[10px] font-bold text-ms-text-muted uppercase tracking-wider mb-1.5 flex items-center justify-between">
+                  <span>Previous Bowlers in this match</span>
+                  <span className="text-[9px] font-semibold text-ms-cyan">Tap to select directly</span>
                 </div>
-                <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto p-1 bg-ms-bg-input rounded-xl border border-ms-border">
-                  {previousBowlers.map((bName) => (
-                    <button
-                      key={bName}
-                      type="button"
-                      onClick={() => {
-                        setNewBowlerName(bName);
-                      }}
-                      className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
-                        newBowlerName === bName
-                          ? 'bg-ms-cyan text-slate-950 font-black shadow-sm'
-                          : 'bg-ms-bg-card border border-ms-border text-ms-text-primary hover:border-ms-cyan'
-                      }`}
-                    >
-                      <User className="w-3 h-3 opacity-70" />
-                      <span>{bName}</span>
-                    </button>
-                  ))}
+                <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto p-1.5 bg-ms-bg-input rounded-xl border border-ms-border">
+                  {previousBowlers.map((bName) => {
+                    const isLastBowler = bName.trim().toUpperCase() === lastOverBowlerName;
+                    return (
+                      <button
+                        key={bName}
+                        type="button"
+                        disabled={isLastBowler}
+                        onClick={() => handleSelectPreviousBowler(bName)}
+                        title={isLastBowler ? 'Cannot bowl consecutive overs' : `Select ${bName} as next bowler`}
+                        className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all flex items-center gap-1.5 ${
+                          isLastBowler
+                            ? 'opacity-40 cursor-not-allowed bg-slate-200 dark:bg-slate-800 text-slate-400 border border-slate-300 dark:border-slate-700'
+                            : 'ms-btn-elevated hover:border-ms-cyan hover:text-ms-cyan cursor-pointer active:scale-95'
+                        }`}
+                      >
+                        <User className="w-3 h-3 opacity-70" />
+                        <span>{bName}</span>
+                        {isLastBowler && (
+                          <span className="text-[9px] font-normal opacity-75">(last over)</span>
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             )}
 
             <div className="space-y-1.5 mb-4">
-              <label className="ms-input-label text-xs">Or type bowler name</label>
-              <input
-                type="text"
+              <label className="ms-input-label text-xs">Search Registered Bowler (*)</label>
+              <PlayerSelector
                 value={newBowlerName}
-                onChange={(e) => setNewBowlerName(e.target.value.toUpperCase())}
-                placeholder="e.g. Next Bowler"
-                className="ms-input text-sm py-2 uppercase"
-                autoFocus
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleChangeBowlerConfirm();
+                selectedId={newBowlerId}
+                onChange={(player) => {
+                  setNewBowlerName(player ? player.name : '');
+                  setNewBowlerId(player ? (player.player_id || player.id) : '');
                 }}
+                disabledPlayers={[matchData?.striker?.name, matchData?.non_striker?.name]}
+                placeholder="Search bowler by name or ID..."
+                required
+                autoFocus
               />
             </div>
 
@@ -1772,17 +2073,18 @@ export default function LiveMatch() {
                 type="button"
                 onClick={() => {
                   setNewBowlerName('');
+                  setNewBowlerId('');
                   setShowBowlerModal(false);
                 }}
-                className="flex-1 py-2 rounded-xl bg-ms-bg-elevated hover:bg-ms-bg-elevated/70 text-ms-text-secondary hover:text-ms-text-primary border border-ms-border text-xs font-bold cursor-pointer"
+                className="ms-btn ms-btn-outline ms-btn-sm flex-1 cursor-pointer"
               >
                 Skip / Keep Same
               </button>
               <button
                 type="button"
                 onClick={handleChangeBowlerConfirm}
-                disabled={!newBowlerName.trim()}
-                className="flex-1 py-2 rounded-xl bg-ms-cyan hover:bg-ms-cyan-light text-slate-950 text-xs font-black shadow-md cursor-pointer disabled:opacity-50"
+                disabled={!newBowlerId || !newBowlerName.trim()}
+                className="ms-btn ms-btn-primary ms-btn-sm flex-1 cursor-pointer disabled:opacity-50"
               >
                 Confirm Bowler
               </button>
@@ -1796,36 +2098,44 @@ export default function LiveMatch() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs animate-fadeIn">
           <form onSubmit={handleSavePlayerName} className="ms-card p-5 max-w-sm w-full bg-ms-bg-card border-ms-border shadow-2xl rounded-2xl">
             <h3 className="text-sm font-black text-ms-text-primary mb-2 flex items-center gap-2">
-              <Edit2 className="w-4 h-4 text-ms-cyan" />
+              <Edit2 className="w-4 h-4 text-slate-800 dark:text-white" />
               <span>
                 Edit {editPlayerModal.role === 'striker' ? 'Striker' : editPlayerModal.role === 'non_striker' ? 'Non-Striker' : 'Bowler'} Name
               </span>
             </h3>
             <p className="text-xs text-ms-text-secondary mb-3">
-              Enter the player's name directly:
+              Select replacement registered player from list:
             </p>
 
-            <input
-              type="text"
-              value={editPlayerModal.name}
-              onChange={(e) => setEditPlayerModal({ ...editPlayerModal, name: e.target.value.toUpperCase() })}
-              placeholder="Enter player name"
-              className="ms-input text-sm py-2 mb-4 uppercase"
-              autoFocus
-              required
-            />
+            <div className="mb-4">
+              <PlayerSelector
+                value={editPlayerModal.name}
+                selectedId={editPlayerModal.playerId}
+                onChange={(player) =>
+                  setEditPlayerModal((prev) => ({
+                    ...prev,
+                    name: player ? player.name : '',
+                    playerId: player ? (player.player_id || player.id) : ''
+                  }))
+                }
+                placeholder="Search player by name or ID..."
+                required
+                autoFocus
+              />
+            </div>
 
             <div className="flex items-center justify-end gap-2">
               <button
                 type="button"
-                onClick={() => setEditPlayerModal({ isOpen: false, role: '', name: '' })}
-                className="flex-1 py-2 rounded-xl bg-ms-bg-elevated hover:bg-ms-bg-elevated/70 text-ms-text-secondary hover:text-ms-text-primary border border-ms-border text-xs font-bold cursor-pointer"
+                onClick={() => setEditPlayerModal({ isOpen: false, role: '', name: '', playerId: '' })}
+                className="ms-btn ms-btn-outline ms-btn-sm flex-1 cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                className="flex-1 py-2 rounded-xl bg-ms-cyan hover:bg-ms-cyan-light text-slate-950 text-xs font-black shadow-md cursor-pointer"
+                disabled={!editPlayerModal.playerId || !editPlayerModal.name}
+                className="ms-btn ms-btn-primary ms-btn-sm flex-1 cursor-pointer disabled:opacity-50"
               >
                 Save Name
               </button>
@@ -1958,13 +2268,28 @@ export default function LiveMatch() {
                   <label className="ms-input-label text-[11px] font-semibold text-ms-text-secondary">
                     Opening Striker ({upcomingBattingTeam}) *
                   </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. BATTER 1"
+                  <PlayerSelector
                     value={secondInningsForm.striker}
-                    onChange={(e) => setSecondInningsForm((prev) => ({ ...prev, striker: e.target.value.toUpperCase() }))}
-                    className="ms-input text-xs py-1.5 uppercase"
+                    selectedId={secondInningsForm.strikerId}
+                    onChange={(player) =>
+                      setSecondInningsForm((prev) => ({
+                        ...prev,
+                        striker: player ? player.name : '',
+                        strikerId: player ? player.player_id : '',
+                        strikerUuid: player ? player.id : '',
+                        strikerPhoto: player ? (player.photo_url || '') : ''
+                      }))
+                    }
+                    disabledPlayers={[
+                      secondInningsForm.nonStrikerUuid,
+                      secondInningsForm.nonStrikerId,
+                      secondInningsForm.nonStriker,
+                      secondInningsForm.bowlerUuid,
+                      secondInningsForm.bowlerId,
+                      secondInningsForm.bowler
+                    ].filter(Boolean)}
+                    placeholder="Search opening striker by name or ID..."
+                    required
                   />
                 </div>
 
@@ -1972,13 +2297,28 @@ export default function LiveMatch() {
                   <label className="ms-input-label text-[11px] font-semibold text-ms-text-secondary">
                     Opening Non-Striker ({upcomingBattingTeam}) *
                   </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. BATTER 2"
+                  <PlayerSelector
                     value={secondInningsForm.nonStriker}
-                    onChange={(e) => setSecondInningsForm((prev) => ({ ...prev, nonStriker: e.target.value.toUpperCase() }))}
-                    className="ms-input text-xs py-1.5 uppercase"
+                    selectedId={secondInningsForm.nonStrikerId}
+                    onChange={(player) =>
+                      setSecondInningsForm((prev) => ({
+                        ...prev,
+                        nonStriker: player ? player.name : '',
+                        nonStrikerId: player ? player.player_id : '',
+                        nonStrikerUuid: player ? player.id : '',
+                        nonStrikerPhoto: player ? (player.photo_url || '') : ''
+                      }))
+                    }
+                    disabledPlayers={[
+                      secondInningsForm.strikerUuid,
+                      secondInningsForm.strikerId,
+                      secondInningsForm.striker,
+                      secondInningsForm.bowlerUuid,
+                      secondInningsForm.bowlerId,
+                      secondInningsForm.bowler
+                    ].filter(Boolean)}
+                    placeholder="Search opening non-striker by name or ID..."
+                    required
                   />
                 </div>
 
@@ -1986,13 +2326,28 @@ export default function LiveMatch() {
                   <label className="ms-input-label text-[11px] font-semibold text-ms-text-secondary">
                     Opening Bowler ({upcomingBowlingTeam}) *
                   </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. BOWLER 1"
+                  <PlayerSelector
                     value={secondInningsForm.bowler}
-                    onChange={(e) => setSecondInningsForm((prev) => ({ ...prev, bowler: e.target.value.toUpperCase() }))}
-                    className="ms-input text-xs py-1.5 uppercase"
+                    selectedId={secondInningsForm.bowlerId}
+                    onChange={(player) =>
+                      setSecondInningsForm((prev) => ({
+                        ...prev,
+                        bowler: player ? player.name : '',
+                        bowlerId: player ? player.player_id : '',
+                        bowlerUuid: player ? player.id : '',
+                        bowlerPhoto: player ? (player.photo_url || '') : ''
+                      }))
+                    }
+                    disabledPlayers={[
+                      secondInningsForm.strikerUuid,
+                      secondInningsForm.strikerId,
+                      secondInningsForm.striker,
+                      secondInningsForm.nonStrikerUuid,
+                      secondInningsForm.nonStrikerId,
+                      secondInningsForm.nonStriker
+                    ].filter(Boolean)}
+                    placeholder="Search opening bowler by name or ID..."
+                    required
                   />
                 </div>
 
@@ -2003,13 +2358,18 @@ export default function LiveMatch() {
                       setShowEndInningsModal(false);
                       setNextInningsBattingChoice(null);
                     }}
-                    className="flex-1 py-2 rounded-xl bg-ms-bg-elevated text-ms-text-secondary hover:text-ms-text-primary border border-ms-border text-xs font-bold cursor-pointer text-center"
+                    className="ms-btn ms-btn-outline ms-btn-sm flex-1 cursor-pointer text-center"
                   >
                     Keep Scoring {inningsName}
                   </button>
                   <button
                     type="submit"
-                    className="flex-1 py-2 rounded-xl bg-ms-cyan hover:bg-ms-cyan-light text-slate-950 text-xs font-black shadow-md cursor-pointer text-center"
+                    disabled={
+                      !secondInningsForm.strikerId ||
+                      !secondInningsForm.nonStrikerId ||
+                      !secondInningsForm.bowlerId
+                    }
+                    className="ms-btn ms-btn-primary ms-btn-sm flex-1 cursor-pointer text-center disabled:opacity-50"
                   >
                     Start {nextInningsName} Innings
                   </button>
@@ -2069,19 +2429,21 @@ export default function LiveMatch() {
                 </div>
               </button>
 
-              {/* Option 3: Delete Match */}
-              <button
-                type="button"
-                onClick={() => setDeleteConfirmOpen(true)}
-                className="w-full p-3 rounded-xl bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 flex items-center gap-3 text-left transition-all cursor-pointer group"
-              >
-                <div className="w-9 h-9 rounded-lg bg-red-500/15 text-red-400 flex items-center justify-center flex-shrink-0">
-                  <Trash2 className="w-4 h-4" />
-                </div>
-                <div className="text-xs font-bold text-red-400 group-hover:text-red-300 transition-colors">
-                  Delete Match Permanently
-                </div>
-              </button>
+              {/* Option 3: Delete Match (Admin only) */}
+              {isAdmin && (
+                <button
+                  type="button"
+                  onClick={() => setDeleteConfirmOpen(true)}
+                  className="w-full p-3 rounded-xl bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 flex items-center gap-3 text-left transition-all cursor-pointer group"
+                >
+                  <div className="w-9 h-9 rounded-lg bg-red-500/15 text-red-400 flex items-center justify-center flex-shrink-0">
+                    <Trash2 className="w-4 h-4" />
+                  </div>
+                  <div className="text-xs font-bold text-red-400 group-hover:text-red-300 transition-colors">
+                    Delete Match Permanently
+                  </div>
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -2099,16 +2461,16 @@ export default function LiveMatch() {
               <button
                 type="button"
                 onClick={() => setCancelConfirmOpen(false)}
-                className="flex-1 py-2.5 rounded-xl bg-ms-bg-elevated text-ms-text-secondary hover:text-ms-text-primary border border-ms-border text-xs font-bold cursor-pointer transition-colors"
+                className="ms-btn ms-btn-outline ms-btn-sm flex-1 cursor-pointer"
               >
                 No
               </button>
               <button
                 type="button"
                 onClick={handleConfirmCancelMatch}
-                className="flex-1 py-2.5 rounded-xl bg-orange-600 hover:bg-orange-500 text-white text-xs font-black shadow-md cursor-pointer transition-colors"
+                className="ms-btn ms-btn-danger ms-btn-sm flex-1 cursor-pointer"
               >
-                Yes
+                Yes, Cancel
               </button>
             </div>
           </div>
@@ -2127,16 +2489,16 @@ export default function LiveMatch() {
               <button
                 type="button"
                 onClick={() => setDeleteConfirmOpen(false)}
-                className="flex-1 py-2.5 rounded-xl bg-ms-bg-elevated text-ms-text-secondary hover:text-ms-text-primary border border-ms-border text-xs font-bold cursor-pointer transition-colors"
+                className="ms-btn ms-btn-outline ms-btn-sm flex-1 cursor-pointer"
               >
-                No
+                Cancel
               </button>
               <button
                 type="button"
                 onClick={handleConfirmDeleteMatch}
-                className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-black shadow-md cursor-pointer transition-colors"
+                className="ms-btn ms-btn-danger ms-btn-sm flex-1 cursor-pointer"
               >
-                Yes
+                Delete Match
               </button>
             </div>
           </div>
@@ -2145,16 +2507,16 @@ export default function LiveMatch() {
 
       {/* Undo Confirmation Dialog (For Wickets & Concluded Match Events) */}
       {undoConfirmModal.isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-xs animate-fadeIn">
-          <div className="ms-card p-5 max-w-sm w-full bg-[#111e38] border border-cyan-500/50 shadow-2xl rounded-2xl text-center text-white">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs animate-fadeIn">
+          <div className="ms-card p-5 max-w-sm w-full bg-ms-bg-card border border-cyan-500/50 shadow-2xl rounded-2xl text-center">
             <div className="w-10 h-10 rounded-full bg-cyan-500/20 border border-cyan-400 flex items-center justify-center mx-auto mb-3">
-              <Undo2 className="w-5 h-5 text-cyan-400" />
+              <Undo2 className="w-5 h-5 text-cyan-500" />
             </div>
-            <h3 className="text-base font-black text-white mb-4">
+            <h3 className="text-base font-black text-ms-text-primary mb-3">
               {undoConfirmModal.title}
             </h3>
             {undoConfirmModal.message && (
-              <p className="text-xs text-slate-300 leading-relaxed mb-4">
+              <p className="text-xs text-ms-text-secondary leading-relaxed mb-4">
                 {undoConfirmModal.message}
               </p>
             )}
@@ -2162,14 +2524,14 @@ export default function LiveMatch() {
               <button
                 type="button"
                 onClick={() => setUndoConfirmModal({ isOpen: false, title: '', message: '' })}
-                className="flex-1 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-600 text-xs font-bold cursor-pointer"
+                className="ms-btn ms-btn-outline ms-btn-sm flex-1 cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={executeUndo}
-                className="flex-1 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 text-xs font-black shadow-md cursor-pointer"
+                className="ms-btn ms-btn-primary ms-btn-sm flex-1 cursor-pointer"
               >
                 Confirm Undo
               </button>

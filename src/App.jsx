@@ -1,12 +1,16 @@
 import React, { useState } from 'react';
 import { Routes, Route, Navigate, Link } from 'react-router-dom';
-import { Moon, Sun } from 'lucide-react';
+import { Moon, Sun, ShieldCheck } from 'lucide-react';
 import TopNav from './components/TopNav';
 import BottomNav from './components/BottomNav';
 import SplashScreen from './components/SplashScreen';
+import AdminPinModal from './components/AdminPinModal';
 import { useTheme } from './contexts/ThemeContext';
 import { useLanguage } from './contexts/LanguageContext';
+import { useAdmin } from './contexts/AdminContext';
+import { useSecretLogoTrigger } from './utils/useSecretLogoTrigger';
 import LanguageSwitcher from './components/LanguageSwitcher';
+import AdminLogoutButton from './components/AdminLogoutButton';
 
 // Pages
 import Home from './pages/Home';
@@ -16,10 +20,13 @@ import Live from './pages/Live';
 import LiveMatch from './pages/LiveMatch';
 import Records from './pages/Records';
 import Toss from './pages/Toss';
+import Players from './pages/Players';
 
 export default function App() {
   const { theme, toggleTheme } = useTheme();
   const { t } = useLanguage();
+  const { isAdmin, openPinScreen, logoutAdmin } = useAdmin();
+  const { handleLogoClick, isAnimating } = useSecretLogoTrigger(openPinScreen);
   const [showSplash, setShowSplash] = useState(() => {
     try {
       return !sessionStorage.getItem('ms_splash_seen');
@@ -42,17 +49,35 @@ export default function App() {
       {/* Animated Opening Splash Screen for App Launch */}
       {showSplash && <SplashScreen onFinish={handleSplashFinish} />}
 
+      {/* Hidden Admin PIN Screen Modal */}
+      <AdminPinModal />
+
       {/* Desktop Header */}
       <TopNav />
 
-      {/* Mobile Sticky Top Header with Theme Switcher & Version */}
-      <header className="md:hidden flex items-center justify-between px-4 py-1.5 min-h-[50px] bg-white dark:bg-[#111827] border-b border-slate-200 dark:border-ms-border sticky top-0 z-40 safe-area-top shadow-xs">
-        <Link to="/" className="flex items-center gap-2.5 text-ms-cyan no-underline">
-          <img src="/logo.png" alt="MoonLight Strikers" className="w-8 h-8 rounded-full object-cover border border-cyan-400/40 shadow-xs flex-shrink-0" />
-          <div className="flex flex-col leading-tight">
-            <span className="font-semibold text-sm tracking-tight text-ms-cyan">MoonLight Strikers</span>
-            <span className="text-[10px] font-score tabular-nums text-slate-400 tracking-wider">v1.1.0</span>
-          </div>
+      {/* Mobile Sticky Top Header with Theme Switcher, Admin status, & Version */}
+      <header className="md:hidden flex items-center justify-between px-4 ms-mobile-header min-h-[50px] bg-white dark:bg-[#111827] border-b border-slate-200 dark:border-ms-border sticky top-0 z-40 shadow-xs">
+        {/* Brand with Secret 5-Click Header Logo Trigger */}
+        <Link
+          to="/"
+          onClick={handleLogoClick}
+          className="flex items-center gap-2 text-ms-cyan no-underline select-none cursor-pointer"
+        >
+          <img
+            src="/logo.png"
+            alt="MoonLight Strikers"
+            className={`w-8 h-8 rounded-full object-cover border border-cyan-400/40 shadow-xs flex-shrink-0 transition-transform duration-100 ${
+              isAnimating ? 'scale-90' : 'active:scale-95'
+            }`}
+          />
+          {!isAdmin ? (
+            <div className="flex flex-col leading-tight">
+              <span className="font-semibold text-sm tracking-tight text-ms-cyan">MoonLight Strikers</span>
+              <span className="text-[10px] font-score tabular-nums text-slate-400 tracking-wider">v2.0</span>
+            </div>
+          ) : (
+            <span className="text-[10px] font-score tabular-nums text-slate-400 tracking-wider">v2.0</span>
+          )}
         </Link>
         <div className="flex items-center gap-1.5">
           <LanguageSwitcher />
@@ -75,11 +100,14 @@ export default function App() {
               </>
             )}
           </button>
+
+          {/* Dedicated Circular Red Glossy Admin Logout Button (top-right corner) */}
+          <AdminLogoutButton />
         </div>
       </header>
 
       {/* Main Centered Content */}
-      <main className="flex-1 w-full pb-16 md:pb-6 overflow-x-hidden flex flex-col">
+      <main className="flex-1 w-full pb-[calc(6rem+var(--safe-bottom))] md:pb-6 overflow-x-hidden flex flex-col">
         <Routes>
           {/* Main cricket routes - open directly to everyone without login */}
           <Route path="/" element={<Home />} />
@@ -91,11 +119,12 @@ export default function App() {
           <Route path="/records" element={<Records />} />
           <Route path="/toss" element={<Toss />} />
 
+          <Route path="/players" element={<Players />} />
+
           {/* Legacy redirects */}
           <Route path="/login" element={<Navigate to="/matches" replace />} />
           <Route path="/register" element={<Navigate to="/matches" replace />} />
           <Route path="/forgot-password" element={<Navigate to="/matches" replace />} />
-          <Route path="/players" element={<Navigate to="/matches" replace />} />
           <Route path="/club" element={<Navigate to="/matches" replace />} />
 
           {/* Fallback */}

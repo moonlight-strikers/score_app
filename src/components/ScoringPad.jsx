@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { BALL_TYPES, WICKET_TYPES } from '../utils/cricketRules';
 import { RotateCw, Undo2, AlertTriangle, Flag } from 'lucide-react';
+import PlayerSelector from './PlayerSelector';
 
 export default function ScoringPad({
   onScoreBall,
@@ -20,6 +21,7 @@ export default function ScoringPad({
     type: WICKET_TYPES.CAUGHT,
     playerOut: 'striker',
     newBatter: '',
+    newBatterId: '',
     fielder: ''
   });
 
@@ -31,6 +33,7 @@ export default function ScoringPad({
       type: WICKET_TYPES.CAUGHT,
       playerOut: 'striker',
       newBatter: '',
+      newBatterId: '',
       fielder: ''
     });
     setShowWicketModal(true);
@@ -38,11 +41,15 @@ export default function ScoringPad({
 
   const handleConfirmWicket = (e) => {
     if (e) e.preventDefault();
+    if (!wicketDetails.newBatterId || !wicketDetails.newBatter) {
+      return;
+    }
     onWicket({
       wicketType: wicketDetails.type,
       playerOut: wicketDetails.playerOut === 'striker' ? strikerName : nonStrikerName,
       isStriker: wicketDetails.playerOut === 'striker',
-      newBatter: wicketDetails.newBatter?.trim() || `Batter`,
+      newBatter: wicketDetails.newBatter?.trim(),
+      newBatterId: wicketDetails.newBatterId,
       fielder: wicketDetails.fielder?.trim() || ''
     });
     setShowWicketModal(false);
@@ -109,10 +116,7 @@ export default function ScoringPad({
       </div>
 
       {/* 6 Tactile Run Buttons (0, 1, 2, 3, 4, 6) */}
-      <div>
-        <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1 px-0.5">
-          SCORE RUNS
-        </div>
+      <div className="pt-0.5">
         <div className="grid grid-cols-3 gap-2">
           {/* Top Row: 0, 1, 2 */}
           {/* 0 */}
@@ -177,7 +181,7 @@ export default function ScoringPad({
         <button
           type="button"
           onClick={() => onScoreBall({ runs: 1, type: BALL_TYPES.WIDE, batsmanRuns: 0 })}
-          className="h-11 sm:h-12 rounded-xl bg-[#132038] hover:bg-[#1a2c4e] border border-slate-700/80 text-cyan-300 font-bold text-xs sm:text-sm transition-all active:scale-95 cursor-pointer flex items-center justify-center shadow-sm"
+          className="h-11 rounded-full ms-btn-elevated font-semibold text-xs sm:text-sm transition-all active:scale-95 cursor-pointer flex items-center justify-center shadow-2xs"
           title="Wide Ball: Instant +1 extra run"
         >
           Wide Ball
@@ -185,14 +189,14 @@ export default function ScoringPad({
         <button
           type="button"
           onClick={() => { setExtraRuns(0); setExtraModal('NB'); }}
-          className="h-11 sm:h-12 rounded-xl bg-[#132038] hover:bg-[#1a2c4e] border border-slate-700/80 text-cyan-300 font-bold text-xs sm:text-sm transition-all active:scale-95 cursor-pointer flex items-center justify-center shadow-sm"
+          className="h-11 rounded-full ms-btn-elevated font-semibold text-xs sm:text-sm transition-all active:scale-95 cursor-pointer flex items-center justify-center shadow-2xs"
         >
           No Ball
         </button>
         <button
           type="button"
           onClick={() => { setExtraRuns(1); setExtraModal('LB'); }}
-          className="h-11 sm:h-12 rounded-xl bg-[#132038] hover:bg-[#1a2c4e] border border-slate-700/80 text-slate-300 font-bold text-xs sm:text-sm transition-all active:scale-95 cursor-pointer flex items-center justify-center shadow-sm"
+          className="h-11 rounded-full ms-btn-elevated font-semibold text-xs sm:text-sm transition-all active:scale-95 cursor-pointer flex items-center justify-center shadow-2xs"
         >
           Leg Bye
         </button>
@@ -203,7 +207,7 @@ export default function ScoringPad({
         <button
           type="button"
           onClick={handleOpenWicket}
-          className="col-span-2 py-3 rounded-2xl bg-gradient-to-r from-red-600 via-rose-600 to-red-600 hover:from-red-500 hover:to-rose-500 text-white font-black text-sm tracking-wide shadow-lg shadow-red-950/50 flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer border border-red-400/50"
+          className="col-span-2 h-11 rounded-full ms-btn-danger text-white font-bold text-sm tracking-wide shadow-md flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer"
         >
           <AlertTriangle className="w-4 h-4 text-white" />
           <span>WICKET / OUT</span>
@@ -213,13 +217,13 @@ export default function ScoringPad({
           type="button"
           onClick={onUndo}
           disabled={!canUndo || isUndoing}
-          className="py-3 rounded-2xl bg-slate-800 hover:bg-slate-700 border border-slate-600/70 text-slate-200 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-md"
+          className="h-11 rounded-full ms-btn-elevated disabled:opacity-30 disabled:cursor-not-allowed font-semibold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-2xs"
           title={isUndoing ? 'Reversing delivery...' : 'Undo last delivery'}
         >
           {isUndoing ? (
-            <RotateCw className="w-3.5 h-3.5 text-cyan-400 animate-spin" />
+            <RotateCw className="w-3.5 h-3.5 text-white animate-spin" />
           ) : (
-            <Undo2 className="w-3.5 h-3.5 text-cyan-400" />
+            <Undo2 className="w-3.5 h-3.5 text-white" />
           )}
           <span>{isUndoing ? 'Undoing...' : 'Undo'}</span>
         </button>
@@ -228,8 +232,8 @@ export default function ScoringPad({
       {/* Fall of Wicket Modal */}
       {showWicketModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm animate-fadeIn">
-          <form onSubmit={handleConfirmWicket} className="ms-card p-5 max-w-sm w-full bg-[#111e38] border border-red-500/50 shadow-2xl rounded-2xl text-white">
-            <h3 className="text-base font-black text-white flex items-center gap-2 mb-3.5">
+          <form onSubmit={handleConfirmWicket} className="ms-card p-5 max-w-sm w-full bg-white dark:bg-[#111e38] border border-red-500/50 shadow-2xl rounded-2xl text-slate-900 dark:text-white">
+            <h3 className="text-base font-black text-slate-900 dark:text-white flex items-center gap-2 mb-3.5">
               <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-ping" />
               Fall of Wicket
             </h3>
@@ -237,16 +241,16 @@ export default function ScoringPad({
             <div className="space-y-3 mb-5">
               <div>
                 <label className="ms-input-label text-xs">Dismissal Method</label>
-                <div className="grid grid-cols-3 gap-1.5">
-                  {Object.values(WICKET_TYPES).map((type) => (
+                <div className="grid grid-cols-6 gap-1.5">
+                  {Object.values(WICKET_TYPES).map((type, idx) => (
                     <button
                       key={type}
                       type="button"
                       onClick={() => setWicketDetails({ ...wicketDetails, type })}
-                      className={`py-2 px-1 text-center rounded-lg text-xs font-bold border transition-all cursor-pointer truncate ${
+                      className={`${idx < 3 ? 'col-span-2' : 'col-span-3'} py-2 px-1 text-center rounded-lg text-xs font-bold border transition-all cursor-pointer truncate ${
                         wicketDetails.type === type
-                          ? 'bg-red-500/20 border-red-500 text-red-300 shadow-sm'
-                          : 'bg-slate-800/80 border-slate-700 text-slate-300 hover:text-white hover:border-slate-600'
+                          ? 'bg-red-600 border-red-400 text-white font-black shadow-md ring-2 ring-red-500/40'
+                          : 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-800/90 dark:hover:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 hover:text-black dark:hover:text-white'
                       }`}
                     >
                       {type}
@@ -263,8 +267,8 @@ export default function ScoringPad({
                     onClick={() => setWicketDetails({ ...wicketDetails, playerOut: 'striker' })}
                     className={`py-2 px-3 rounded-xl border text-xs font-bold transition-all text-left truncate ${
                       wicketDetails.playerOut === 'striker'
-                        ? 'bg-red-500/20 border-red-500 text-red-300 shadow-sm'
-                        : 'bg-slate-800/80 border-slate-700 text-slate-400'
+                        ? 'bg-red-600 border-red-400 text-white font-black shadow-md ring-2 ring-red-500/40'
+                        : 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-800/90 dark:hover:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-300 hover:text-black dark:hover:text-white'
                     }`}
                   >
                     ★ {strikerName || 'Striker'}
@@ -274,8 +278,8 @@ export default function ScoringPad({
                     onClick={() => setWicketDetails({ ...wicketDetails, playerOut: 'nonStriker' })}
                     className={`py-2 px-3 rounded-xl border text-xs font-bold transition-all text-left truncate ${
                       wicketDetails.playerOut === 'nonStriker'
-                        ? 'bg-red-500/20 border-red-500 text-red-300 shadow-sm'
-                        : 'bg-slate-800/80 border-slate-700 text-slate-400'
+                        ? 'bg-red-600 border-red-400 text-white font-black shadow-md ring-2 ring-red-500/40'
+                        : 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-800/90 dark:hover:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-300 hover:text-black dark:hover:text-white'
                     }`}
                   >
                     {nonStrikerName || 'Non-Striker'}
@@ -285,25 +289,33 @@ export default function ScoringPad({
 
               <div>
                 <label className="ms-input-label text-xs">Incoming Next Batsman Name (*)</label>
-                <input
-                  type="text"
-                  placeholder="e.g. Suresh Kumar"
+                <PlayerSelector
                   value={wicketDetails.newBatter}
-                  onChange={(e) => setWicketDetails({ ...wicketDetails, newBatter: e.target.value })}
-                  className="ms-input text-xs py-2"
+                  selectedId={wicketDetails.newBatterId}
+                  onChange={(player) =>
+                    setWicketDetails((prev) => ({
+                      ...prev,
+                      newBatter: player ? player.name : '',
+                      newBatterId: player ? (player.player_id || player.id) : ''
+                    }))
+                  }
+                  disabledPlayers={[strikerName, nonStrikerName]}
+                  placeholder="Search incoming batsman by name or ID..."
                   required
-                  autoFocus
                 />
               </div>
 
               <div>
                 <label className="ms-input-label text-xs">Fielder / Catcher (Optional)</label>
-                <input
-                  type="text"
-                  placeholder="e.g. Varun Mehta"
+                <PlayerSelector
                   value={wicketDetails.fielder}
-                  onChange={(e) => setWicketDetails({ ...wicketDetails, fielder: e.target.value })}
-                  className="ms-input text-xs py-1.5"
+                  onChange={(player) =>
+                    setWicketDetails((prev) => ({
+                      ...prev,
+                      fielder: player ? player.name : ''
+                    }))
+                  }
+                  placeholder="Search fielder by name or ID (optional)..."
                 />
               </div>
             </div>
@@ -312,13 +324,14 @@ export default function ScoringPad({
               <button
                 type="button"
                 onClick={() => setShowWicketModal(false)}
-                className="flex-1 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition-all cursor-pointer"
+                className="ms-btn ms-btn-outline ms-btn-sm flex-1 cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-black transition-all shadow-md shadow-red-950/40 cursor-pointer"
+                disabled={!wicketDetails.newBatterId || !wicketDetails.newBatter}
+                className="ms-btn ms-btn-danger ms-btn-sm flex-1 cursor-pointer disabled:opacity-50"
               >
                 Confirm OUT
               </button>
@@ -330,8 +343,8 @@ export default function ScoringPad({
       {/* Extras Runs Selector Modal */}
       {extraModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm animate-fadeIn">
-          <div className="ms-card p-5 max-w-xs w-full bg-[#111e38] border border-cyan-500/50 shadow-2xl rounded-2xl text-white">
-            <h3 className="text-sm font-black text-white mb-2 flex items-center gap-2">
+          <div className="ms-card p-5 max-w-xs w-full bg-white dark:bg-[#111e38] border border-cyan-500/50 shadow-2xl rounded-2xl text-slate-900 dark:text-white">
+            <h3 className="text-sm font-black text-slate-900 dark:text-white mb-2 flex items-center gap-2">
               <span className="text-cyan-400 font-bold">Extra:</span>
               {extraModal === 'WD' ? 'Wide Ball' : extraModal === 'NB' ? 'No Ball' : extraModal === 'BYE' ? 'Bye' : 'Leg Bye'}
             </h3>
@@ -341,10 +354,10 @@ export default function ScoringPad({
                   key={r}
                   type="button"
                   onClick={() => setExtraRuns(r)}
-                  className={`h-11 rounded-xl font-score text-base font-bold transition-all cursor-pointer ${
+                  className={`h-11 rounded-full font-score text-base font-bold transition-all cursor-pointer ${
                     extraRuns === r
-                      ? 'bg-cyan-500 text-slate-950 border-2 border-cyan-300 shadow-md shadow-cyan-950'
-                      : 'bg-slate-800 text-white border border-slate-700 hover:border-cyan-500/50'
+                      ? 'ms-btn-primary shadow-md'
+                      : 'ms-btn-elevated'
                   }`}
                 >
                   +{r}
@@ -356,14 +369,14 @@ export default function ScoringPad({
               <button
                 type="button"
                 onClick={() => { setExtraModal(null); setExtraRuns(0); }}
-                className="flex-1 py-2.5 rounded-xl bg-slate-800 text-slate-300 text-xs font-bold cursor-pointer"
+                className="ms-btn ms-btn-outline ms-btn-sm flex-1 cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={handleConfirmExtra}
-                className="flex-1 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 text-xs font-black shadow-md cursor-pointer"
+                className="ms-btn ms-btn-primary ms-btn-sm flex-1 cursor-pointer"
               >
                 Add Extra
               </button>

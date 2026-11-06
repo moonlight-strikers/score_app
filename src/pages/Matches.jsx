@@ -5,12 +5,18 @@ import { supabase } from '../services/supabase';
 import { Trophy, Plus, Calendar, ChevronRight, Zap, Share2, Trash2 } from 'lucide-react';
 import { shareMatchResult, isTwoDaysOld, formatMatchDate, formatMatchTime } from '../utils/shareMatch';
 import { getMatchDisplayTeams } from '../utils/matchDisplay';
+import { useAdmin } from '../contexts/AdminContext';
+import ConfirmModal from '../components/ConfirmModal';
 
 export default function Matches() {
+  const { isAdmin, adminToken } = useAdmin();
   const [filter, setFilter] = useState('all'); // 'all' | 'live' | 'completed' | 'scheduled'
   const [matches, setMatches] = useState([]);
   const [loading, setLoading] = useState(true);
   const [shareToast, setShareToast] = useState(false);
+  const [matchToDelete, setMatchToDelete] = useState(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState(null);
 
   useEffect(() => {
     fetchMatches();
@@ -42,10 +48,25 @@ export default function Matches() {
     }
   }
 
-  const handleDelete = async (matchId) => {
-    if (window.confirm('Are you sure you want to delete this match record?')) {
-      await matchService.deleteMatch(matchId);
+  const handleDelete = (match) => {
+    setDeleteError(null);
+    setMatchToDelete(match);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!matchToDelete) return;
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      const matchId = typeof matchToDelete === 'object' ? matchToDelete.id : matchToDelete;
+      await matchService.deleteMatch(matchId, adminToken);
       setMatches((prev) => prev.filter((m) => m.id !== matchId));
+      setMatchToDelete(null);
+    } catch (err) {
+      console.error('Delete match failed:', err);
+      setDeleteError(err.message || 'Failed to delete match.');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -64,7 +85,7 @@ export default function Matches() {
   });
 
   return (
-    <div className="ms-page pb-4">
+    <div className="ms-page pb-28 md:pb-12">
       {/* Toast notification */}
       {shareToast && (
         <div className="fixed top-14 left-1/2 -translate-x-1/2 z-50 bg-ms-cyan text-ms-text-inverse px-3 py-1.5 rounded-full text-xs font-bold shadow-lg animate-fadeIn flex items-center gap-1.5">
@@ -73,20 +94,6 @@ export default function Matches() {
         </div>
       )}
 
-      <div className="flex items-center justify-between gap-2 mb-3 min-w-0">
-        <div className="min-w-0 flex-1">
-          <h1 className="text-lg md:text-xl font-bold text-ms-text-primary tracking-tight truncate">
-            Matches & Fixtures
-          </h1>
-          <p className="text-[11px] text-ms-text-muted mt-0.5 truncate">
-            Saturday night league records & scorecards
-          </p>
-        </div>
-        <Link to="/matches/create" className="ms-btn ms-btn-primary text-xs py-1.5 px-3 flex-shrink-0 flex items-center gap-1 font-bold">
-          <Plus className="w-3.5 h-3.5" />
-          <span>New Match</span>
-        </Link>
-      </div>
 
       {/* Filter Tabs */}
       <div className="flex items-center gap-2 mb-3 overflow-x-auto pb-1">
@@ -99,10 +106,10 @@ export default function Matches() {
           <button
             key={tab.key}
             onClick={() => setFilter(tab.key)}
-            className={`py-1.5 px-3.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer ${
+            className={`py-1.5 px-4 rounded-full text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
               filter === tab.key
-                ? 'bg-ms-cyan text-ms-text-inverse shadow-sm'
-                : 'bg-ms-bg-card border border-ms-border text-ms-text-secondary hover:text-ms-text-primary'
+                ? 'ms-btn-primary font-bold shadow-sm'
+                : 'ms-btn-elevated'
             }`}
           >
             {tab.label}
@@ -245,23 +252,23 @@ export default function Matches() {
                       <button
                         type="button"
                         onClick={() => handleShare(m)}
-                        className="px-2.5 py-1.5 rounded-lg bg-ms-bg-elevated hover:bg-ms-cyan-subtle border border-ms-border text-ms-text-primary hover:text-ms-cyan text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                        className="ms-btn ms-btn-outline ms-btn-sm"
                         title="Share on WhatsApp"
                       >
-                        <Share2 className="w-3.5 h-3.5 text-ms-cyan" />
+                        <Share2 />
                         <span>Share</span>
                       </button>
                     )}
 
-                    {/* Delete Option for matches 2+ days old */}
-                    {isOld && (
+                    {/* Delete Option strictly for Admin */}
+                    {isAdmin && (
                       <button
                         type="button"
-                        onClick={() => handleDelete(m.id)}
-                        className="px-2.5 py-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/30 text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer"
-                        title="Delete this match (2+ days old)"
+                        onClick={() => handleDelete(m)}
+                        className="ms-btn ms-btn-danger ms-btn-sm"
+                        title="Delete this match record (Admin)"
                       >
-                        <Trash2 className="w-3.5 h-3.5" />
+                        <Trash2 />
                         <span className="hidden sm:inline">Delete</span>
                       </button>
                     )}
@@ -269,12 +276,12 @@ export default function Matches() {
 
                   <Link
                     to={`/live/${m.id}`}
-                    className={`ms-btn text-xs py-1.5 px-3 flex items-center gap-1 ${
-                      isLive ? 'ms-btn-primary' : 'ms-btn-secondary'
+                    className={`ms-btn ms-btn-sm ${
+                      isLive ? 'ms-btn-primary' : 'ms-btn-outline'
                     }`}
                   >
                     <span>{isLive ? 'Score / Watch Live' : 'View Scorecard'}</span>
-                    <ChevronRight className="w-3.5 h-3.5" />
+                    <ChevronRight />
                   </Link>
                 </div>
               </div>
@@ -282,6 +289,34 @@ export default function Matches() {
           })}
         </div>
       )}
+
+      {/* Floating Action Button (FAB) for Creating New Match */}
+      <Link
+        to="/matches/create"
+        className="fixed right-5 bottom-[calc(6.25rem+var(--safe-bottom))] md:bottom-8 md:right-8 z-40 w-14 h-14 rounded-full bg-[var(--primary-color,#0782C6)] hover:bg-[var(--primary-color-hover,#0670ab)] text-white flex items-center justify-center shadow-lg shadow-[rgba(7,130,198,0.35)] hover:scale-105 active:scale-95 transition-all duration-200 border-2 border-white/20"
+        title="New Match"
+        aria-label="New Match"
+      >
+        <Plus className="w-7 h-7 stroke-[2.5]" />
+      </Link>
+
+      {/* In-App Delete Confirmation Modal */}
+      <ConfirmModal
+        isOpen={Boolean(matchToDelete)}
+        onClose={() => {
+          if (!deleting) {
+            setMatchToDelete(null);
+            setDeleteError(null);
+          }
+        }}
+        onConfirm={handleConfirmDelete}
+        title="Delete Match Record?"
+        confirmText="Delete Match"
+        cancelText="Cancel"
+        isDestructive={true}
+        loading={deleting}
+        error={deleteError}
+      />
     </div>
   );
 }

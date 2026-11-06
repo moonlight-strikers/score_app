@@ -33,7 +33,7 @@ export default class ErrorBoundary extends React.Component {
               } catch {}
               window.location.href = '/';
             }}
-            className="px-4 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs shadow-md transition-all cursor-pointer"
+            className="ms-btn ms-btn-primary ms-btn-sm text-xs font-bold shadow-md transition-all cursor-pointer"
           >
             Reset Cache & Reload App
           </button>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Trophy, Plus, Shield, Award, BarChart3 } from 'lucide-react';
+import { Plus, BarChart3 } from 'lucide-react';
 import { matchService } from '../services/matchService';
 import { formatMatchDate } from '../utils/shareMatch';
 
@@ -10,6 +10,12 @@ export default function Records() {
   const [battingLeaders, setBattingLeaders] = useState([]);
   const [bowlingLeaders, setBowlingLeaders] = useState([]);
   const [teamRecords, setTeamRecords] = useState([]);
+
+  const tabs = [
+    { key: 'batting', label: 'Batting' },
+    { key: 'bowling', label: 'Bowling' },
+    { key: 'team', label: 'Team' }
+  ];
 
   useEffect(() => {
     async function loadRecords() {
@@ -174,41 +180,30 @@ export default function Records() {
   const hasAnyData = battingLeaders.length > 0 || bowlingLeaders.length > 0 || teamRecords.length > 0;
 
   return (
-    <div className="ms-page pb-4">
-      <div className="flex items-center gap-2.5 mb-4">
-        <div className="w-10 h-10 rounded-xl bg-ms-six/10 border border-ms-six/30 flex items-center justify-center">
-          <Trophy className="w-5 h-5 text-ms-six" />
-        </div>
-        <div>
-          <h1 className="text-xl md:text-2xl font-bold text-ms-text-primary tracking-tight">
-            Club Records & Leaderboards
-          </h1>
-          <p className="text-xs text-ms-text-muted mt-0.5">
-            Real-time player milestones and match leaderboards
-          </p>
-        </div>
-      </div>
+    <div className="ms-page pb-4 pt-1">
 
-      {/* Tabs */}
-      <div className="flex items-center gap-2 mb-4">
-        {[
-          { key: 'batting', label: 'Batting Leaders' },
-          { key: 'bowling', label: 'Bowling Leaders' },
-          { key: 'team', label: 'Club & Team Records' }
-        ].map((tab) => (
-          <button
-            key={tab.key}
-            type="button"
-            onClick={() => setActiveTab(tab.key)}
-            className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-              activeTab === tab.key
-                ? 'bg-ms-cyan text-ms-text-inverse shadow-sm'
-                : 'bg-ms-bg-card border border-ms-border text-ms-text-secondary hover:text-ms-text-primary'
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
+      {/* Floating Segmented Pill Navigation */}
+      <div
+        role="tablist"
+        aria-label="Records Navigation"
+        className="ms-records-nav"
+      >
+        {tabs.map((tab) => {
+          const isActive = activeTab === tab.key;
+
+          return (
+            <button
+              key={tab.key}
+              type="button"
+              role="tab"
+              aria-selected={isActive}
+              onClick={() => setActiveTab(tab.key)}
+              className={`ms-records-tab ${isActive ? 'ms-records-tab-active' : ''}`}
+            >
+              <span>{tab.label}</span>
+            </button>
+          );
+        })}
       </div>
 
       {loading ? (
@@ -271,39 +266,43 @@ export default function Records() {
                     </div>
                   </div>
 
-                  <div className="ms-card p-4 overflow-x-auto border-ms-border-light">
-                    <h3 className="text-sm font-semibold text-ms-text-primary mb-3">Top Run Scorers</h3>
-                    <table className="ms-table">
-                      <thead>
+                  <div className="ms-card p-3 sm:p-4 overflow-x-auto border-ms-border-light bg-ms-bg-card">
+                    <h3 className="text-base font-bold text-ms-text-primary mb-3">Top Run Scorers</h3>
+                    <table className="ms-table w-full">
+                      <thead className="border-b border-ms-border">
                         <tr>
-                          <th>Rank & Batter</th>
-                          <th className="text-right">Mat</th>
-                          <th className="text-right">Runs</th>
-                          <th className="text-right">HS</th>
-                          <th className="text-right">SR</th>
-                          <th className="text-right">6s</th>
-                          <th className="text-right">4s</th>
+                          <th className="text-left pl-2 sm:pl-3 pr-1 py-2 text-[11px] sm:text-xs font-bold uppercase tracking-wider text-ms-text-muted">Rank &amp; Batter</th>
+                          <th className="text-right px-1.5 sm:px-2 py-2 text-[11px] sm:text-xs font-bold uppercase tracking-wider text-ms-text-muted">Mat</th>
+                          <th className="text-right px-1.5 sm:px-2 py-2 text-[11px] sm:text-xs font-bold uppercase tracking-wider text-ms-text-muted">Runs</th>
+                          <th className="text-right px-1.5 sm:px-2 py-2 text-[11px] sm:text-xs font-bold uppercase tracking-wider text-ms-text-muted">HS</th>
+                          <th className="text-right px-1.5 sm:px-2 py-2 text-[11px] sm:text-xs font-bold uppercase tracking-wider text-ms-text-muted">SR</th>
+                          <th className="text-right px-1.5 sm:px-2.5 py-2 text-[11px] sm:text-xs font-bold uppercase tracking-wider text-ms-text-muted">6s</th>
+                          <th className="text-right pl-1.5 pr-3 sm:pr-4 py-2 text-[11px] sm:text-xs font-bold uppercase tracking-wider text-ms-text-muted">4s</th>
                         </tr>
                       </thead>
                       <tbody>
                         {battingLeaders.map((p) => (
-                          <tr key={p.rank} className="hover:bg-ms-bg-elevated/40">
-                            <td className="py-2.5">
+                          <tr key={p.rank} className="border-b border-ms-border/50 hover:bg-ms-bg-elevated/40 transition-colors last:border-b-0">
+                            <td className="py-2.5 pl-2 sm:pl-3 pr-1">
                               <div className="flex items-center gap-2">
-                                <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${
-                                  p.rank === 1 ? 'bg-amber-400 text-black' : p.rank === 2 ? 'bg-slate-300 text-black' : 'bg-ms-bg-input text-ms-text-muted'
+                                <span className={`w-6 h-6 shrink-0 rounded-full flex items-center justify-center font-bold text-[13px] sm:text-sm tabular-nums leading-none ${
+                                  p.rank === 1
+                                    ? 'bg-amber-500 text-white shadow-xs'
+                                    : p.rank === 2
+                                    ? 'bg-slate-300 dark:bg-slate-600 text-slate-950 dark:text-white shadow-xs'
+                                    : 'bg-transparent text-ms-text-muted font-semibold'
                                 }`}>
                                   {p.rank}
                                 </span>
-                                <span className="font-semibold text-ms-text-primary">{p.name}</span>
+                                <span className="font-bold text-ms-text-primary text-sm sm:text-base truncate max-w-[110px] sm:max-w-none">{p.name}</span>
                               </div>
                             </td>
-                            <td className="text-right font-score text-ms-text-muted tabular-nums">{p.matches}</td>
-                            <td className="text-right font-score font-bold text-ms-cyan text-sm sm:text-base tabular-nums">{p.runs}</td>
-                            <td className="text-right font-score font-semibold text-ms-boundary text-sm tabular-nums">{p.highest}</td>
-                            <td className="text-right font-score font-semibold text-ms-text-primary text-sm tabular-nums">{p.sr}</td>
-                            <td className="text-right font-score font-semibold text-ms-six text-sm tabular-nums">{p.sixes}</td>
-                            <td className="text-right font-score text-ms-text-muted tabular-nums">{p.fours}</td>
+                            <td className="text-right font-score font-bold text-ms-text-primary tabular-nums px-1.5 sm:px-2 text-[14px] sm:text-[16px]">{p.matches}</td>
+                            <td className="text-right font-score font-black text-ms-text-primary tabular-nums px-1.5 sm:px-2 text-[15px] sm:text-[18px]">{p.runs}</td>
+                            <td className="text-right font-score font-bold text-ms-text-primary tabular-nums px-1.5 sm:px-2 text-[14px] sm:text-[16px]">{p.highest}</td>
+                            <td className="text-right font-score font-bold text-ms-text-primary tabular-nums px-1.5 sm:px-2 text-[14px] sm:text-[16px]">{p.sr}</td>
+                            <td className="text-right font-score font-bold text-ms-text-primary tabular-nums px-1.5 sm:px-2.5 text-[14px] sm:text-[16px]">{p.sixes}</td>
+                            <td className="text-right font-score font-bold text-ms-text-primary tabular-nums pl-1.5 pr-3 sm:pr-4 text-[14px] sm:text-[16px]">{p.fours}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -349,37 +348,41 @@ export default function Records() {
                     </div>
                   </div>
 
-                  <div className="ms-card p-4 overflow-x-auto border-ms-border-light">
-                    <h3 className="text-sm font-semibold text-ms-text-primary mb-3">Top Wicket Takers</h3>
-                    <table className="ms-table">
-                      <thead>
+                  <div className="ms-card p-3 sm:p-4 overflow-x-auto border-ms-border-light bg-ms-bg-card">
+                    <h3 className="text-base font-bold text-ms-text-primary mb-3">Top Wicket Takers</h3>
+                    <table className="ms-table w-full">
+                      <thead className="border-b border-ms-border">
                         <tr>
-                          <th>Rank & Bowler</th>
-                          <th className="text-right">Mat</th>
-                          <th className="text-right">Overs</th>
-                          <th className="text-right">Wickets</th>
-                          <th className="text-right">Econ</th>
-                          <th className="text-right">BBI</th>
+                          <th className="text-left pl-2 sm:pl-3 pr-1 py-2 text-[11px] sm:text-xs font-bold uppercase tracking-wider text-ms-text-muted">Rank &amp; Bowler</th>
+                          <th className="text-right px-1.5 sm:px-2 py-2 text-[11px] sm:text-xs font-bold uppercase tracking-wider text-ms-text-muted">Mat</th>
+                          <th className="text-right px-1.5 sm:px-2 py-2 text-[11px] sm:text-xs font-bold uppercase tracking-wider text-ms-text-muted">Overs</th>
+                          <th className="text-right px-1.5 sm:px-2 py-2 text-[11px] sm:text-xs font-bold uppercase tracking-wider text-ms-text-muted">Wickets</th>
+                          <th className="text-right px-1.5 sm:px-2 py-2 text-[11px] sm:text-xs font-bold uppercase tracking-wider text-ms-text-muted">Econ</th>
+                          <th className="text-right pl-1.5 pr-3 sm:pr-4 py-2 text-[11px] sm:text-xs font-bold uppercase tracking-wider text-ms-text-muted">BBI</th>
                         </tr>
                       </thead>
                       <tbody>
                         {bowlingLeaders.map((p) => (
-                          <tr key={p.rank} className="hover:bg-ms-bg-elevated/40">
-                            <td className="py-2.5">
+                          <tr key={p.rank} className="border-b border-ms-border/50 hover:bg-ms-bg-elevated/40 transition-colors last:border-b-0">
+                            <td className="py-2.5 pl-2 sm:pl-3 pr-1">
                               <div className="flex items-center gap-2">
-                                <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${
-                                  p.rank === 1 ? 'bg-amber-400 text-black' : p.rank === 2 ? 'bg-slate-300 text-black' : 'bg-ms-bg-input text-ms-text-muted'
+                                <span className={`w-6 h-6 shrink-0 rounded-full flex items-center justify-center font-bold text-[13px] sm:text-sm tabular-nums leading-none ${
+                                  p.rank === 1
+                                    ? 'bg-amber-500 text-white shadow-xs'
+                                    : p.rank === 2
+                                    ? 'bg-slate-300 dark:bg-slate-600 text-slate-950 dark:text-white shadow-xs'
+                                    : 'bg-transparent text-ms-text-muted font-semibold'
                                 }`}>
                                   {p.rank}
                                 </span>
-                                <span className="font-semibold text-ms-text-primary">{p.name}</span>
+                                <span className="font-bold text-ms-text-primary text-sm sm:text-base truncate max-w-[110px] sm:max-w-none">{p.name}</span>
                               </div>
                             </td>
-                            <td className="text-right font-score text-ms-text-muted tabular-nums">{p.matches}</td>
-                            <td className="text-right font-score font-semibold text-ms-text-secondary tabular-nums">{p.overs}</td>
-                            <td className="text-right font-score font-bold text-ms-wicket text-sm sm:text-base tabular-nums">{p.wickets}</td>
-                            <td className="text-right font-score tabular-nums text-ms-cyan">{p.econ}</td>
-                            <td className="text-right font-score text-ms-live font-semibold tabular-nums">{p.best}</td>
+                            <td className="text-right font-score font-bold text-ms-text-primary tabular-nums px-1.5 sm:px-2 text-[14px] sm:text-[16px]">{p.matches}</td>
+                            <td className="text-right font-score font-bold text-ms-text-primary tabular-nums px-1.5 sm:px-2 text-[14px] sm:text-[16px]">{p.overs}</td>
+                            <td className="text-right font-score font-black text-ms-text-primary tabular-nums px-1.5 sm:px-2 text-[15px] sm:text-[18px]">{p.wickets}</td>
+                            <td className="text-right font-score font-bold tabular-nums text-ms-text-primary px-1.5 sm:px-2 text-[14px] sm:text-[16px]">{p.econ}</td>
+                            <td className="text-right font-score font-bold text-ms-text-primary tabular-nums pl-1.5 pr-3 sm:pr-4 text-[14px] sm:text-[16px]">{p.best}</td>
                           </tr>
                         ))}
                       </tbody>
