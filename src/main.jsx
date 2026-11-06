@@ -6,7 +6,6 @@ import ErrorBoundary from './components/ErrorBoundary';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { LanguageProvider } from './contexts/LanguageContext';
 import { AdminProvider } from './contexts/AdminContext';
-import { VersionProvider } from './contexts/VersionContext';
 import './index.css';
 
 ReactDOM.createRoot(document.getElementById('root')).render(
@@ -16,9 +15,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
         <ThemeProvider>
           <LanguageProvider>
             <AdminProvider>
-              <VersionProvider>
-                <App />
-              </VersionProvider>
+              <App />
             </AdminProvider>
           </LanguageProvider>
         </ThemeProvider>

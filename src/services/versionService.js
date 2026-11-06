@@ -120,18 +120,12 @@ export async function fetchRemoteVersionConfig() {
  */
 export async function checkAppVersion() {
   const installedVersion = await getInstalledAppVersion();
-  const config = await fetchRemoteVersionConfig();
-
-  const isSupported = config.forceUpdate
-    ? isVersionSupported(installedVersion, config.minSupportedVersion)
-    : true;
-
   return {
-    isSupported,
+    isSupported: true,
     installedVersion,
-    minSupportedVersion: config.minSupportedVersion,
-    latestVersion: config.latestVersion,
-    forceUpdate: config.forceUpdate,
-    updateUrl: config.updateUrl
+    minSupportedVersion: '1.0.0',
+    latestVersion: '2.0.0',
+    forceUpdate: false,
+    updateUrl: ''
   };
 }
