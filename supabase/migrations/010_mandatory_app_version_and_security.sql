@@ -165,50 +165,101 @@ $$;
 -- ============================================================
 -- 4. SERVER-SIDE AUTHORIZATION: TIGHTEN RLS POLICIES
 -- Older APKs (versions < 2.0.0) that do not send 'x-app-version'
--- will be rejected by Supabase RLS on mutation operations.
--- Table existence checks prevent relation does not exist errors.
+-- will be completely rejected by Supabase RLS on ALL operations:
+-- SELECT (reading matches/players), INSERT (creating matches/players),
+-- and UPDATE (scoring matches/deliveries).
 -- ============================================================
 
 -- ── Table: matches ──
 DO $$
+DECLARE
+  r RECORD;
 BEGIN
   IF to_regclass('public.matches') IS NOT NULL THEN
-    EXECUTE 'DROP POLICY IF EXISTS "Allow public insert matches" ON public.matches';
-    EXECUTE 'DROP POLICY IF EXISTS "Allow public update matches" ON public.matches';
-    EXECUTE 'DROP POLICY IF EXISTS "Matches are creatable by everyone" ON public.matches';
-    EXECUTE 'DROP POLICY IF EXISTS "Matches are updatable by everyone" ON public.matches';
-    EXECUTE 'DROP POLICY IF EXISTS "Allow versioned insert matches" ON public.matches';
-    EXECUTE 'DROP POLICY IF EXISTS "Allow versioned update matches" ON public.matches';
+    ALTER TABLE public.matches ENABLE ROW LEVEL SECURITY;
 
+    -- Drop ALL existing policies to eliminate permissive bypasses
+    FOR r IN (
+      SELECT policyname
+      FROM pg_policies
+      WHERE schemaname = 'public' AND tablename = 'matches'
+    ) LOOP
+      EXECUTE format('DROP POLICY IF EXISTS %I ON public.matches', r.policyname);
+    END LOOP;
+
+    -- SELECT: Blocked for old APKs (< 2.0.0)
+    EXECUTE 'CREATE POLICY "Allow versioned select matches" ON public.matches FOR SELECT USING (public.is_client_version_supported())';
+
+    -- INSERT: Blocked for old APKs (< 2.0.0)
     EXECUTE 'CREATE POLICY "Allow versioned insert matches" ON public.matches FOR INSERT WITH CHECK (public.is_client_version_supported())';
+
+    -- UPDATE: Blocked for old APKs (< 2.0.0)
     EXECUTE 'CREATE POLICY "Allow versioned update matches" ON public.matches FOR UPDATE USING (public.is_client_version_supported()) WITH CHECK (public.is_client_version_supported())';
+
+    -- DELETE: Restricted completely (only Admin PIN RPC can delete)
+    EXECUTE 'CREATE POLICY "Prevent public delete matches" ON public.matches FOR DELETE USING (false)';
   END IF;
 END $$;
 
 -- ── Table: ball_by_ball ──
 DO $$
+DECLARE
+  r RECORD;
 BEGIN
   IF to_regclass('public.ball_by_ball') IS NOT NULL THEN
-    EXECUTE 'DROP POLICY IF EXISTS "Allow public insert ball_by_ball" ON public.ball_by_ball';
-    EXECUTE 'DROP POLICY IF EXISTS "Allow public update ball_by_ball" ON public.ball_by_ball';
-    EXECUTE 'DROP POLICY IF EXISTS "Balls are creatable by everyone" ON public.ball_by_ball';
-    EXECUTE 'DROP POLICY IF EXISTS "Balls are updatable by everyone" ON public.ball_by_ball';
-    EXECUTE 'DROP POLICY IF EXISTS "Allow versioned insert ball_by_ball" ON public.ball_by_ball';
-    EXECUTE 'DROP POLICY IF EXISTS "Allow versioned update ball_by_ball" ON public.ball_by_ball';
+    ALTER TABLE public.ball_by_ball ENABLE ROW LEVEL SECURITY;
 
+    -- Drop ALL existing policies on ball_by_ball
+    FOR r IN (
+      SELECT policyname
+      FROM pg_policies
+      WHERE schemaname = 'public' AND tablename = 'ball_by_ball'
+    ) LOOP
+      EXECUTE format('DROP POLICY IF EXISTS %I ON public.ball_by_ball', r.policyname);
+    END LOOP;
+
+    -- SELECT: Blocked for old APKs (< 2.0.0)
+    EXECUTE 'CREATE POLICY "Allow versioned select ball_by_ball" ON public.ball_by_ball FOR SELECT USING (public.is_client_version_supported())';
+
+    -- INSERT: Blocked for old APKs (< 2.0.0)
     EXECUTE 'CREATE POLICY "Allow versioned insert ball_by_ball" ON public.ball_by_ball FOR INSERT WITH CHECK (public.is_client_version_supported())';
+
+    -- UPDATE: Blocked for old APKs (< 2.0.0)
     EXECUTE 'CREATE POLICY "Allow versioned update ball_by_ball" ON public.ball_by_ball FOR UPDATE USING (public.is_client_version_supported()) WITH CHECK (public.is_client_version_supported())';
+
+    -- DELETE: Blocked for old APKs (< 2.0.0)
+    EXECUTE 'CREATE POLICY "Allow versioned delete ball_by_ball" ON public.ball_by_ball FOR DELETE USING (public.is_client_version_supported())';
   END IF;
 END $$;
 
 -- ── Table: players ──
 DO $$
+DECLARE
+  r RECORD;
 BEGIN
   IF to_regclass('public.players') IS NOT NULL THEN
-    EXECUTE 'DROP POLICY IF EXISTS "Allow public update players" ON public.players';
-    EXECUTE 'DROP POLICY IF EXISTS "Allow versioned update players" ON public.players';
+    ALTER TABLE public.players ENABLE ROW LEVEL SECURITY;
 
+    -- Drop ALL existing policies on players
+    FOR r IN (
+      SELECT policyname
+      FROM pg_policies
+      WHERE schemaname = 'public' AND tablename = 'players'
+    ) LOOP
+      EXECUTE format('DROP POLICY IF EXISTS %I ON public.players', r.policyname);
+    END LOOP;
+
+    -- SELECT: Blocked for old APKs (< 2.0.0)
+    EXECUTE 'CREATE POLICY "Allow versioned select players" ON public.players FOR SELECT USING (public.is_client_version_supported())';
+
+    -- INSERT: Blocked for old APKs (< 2.0.0)
+    EXECUTE 'CREATE POLICY "Allow versioned insert players" ON public.players FOR INSERT WITH CHECK (public.is_client_version_supported())';
+
+    -- UPDATE: Blocked for old APKs (< 2.0.0)
     EXECUTE 'CREATE POLICY "Allow versioned update players" ON public.players FOR UPDATE USING (public.is_client_version_supported()) WITH CHECK (public.is_client_version_supported())';
+
+    -- DELETE: Restricted completely (only Admin PIN RPC can delete)
+    EXECUTE 'CREATE POLICY "Prevent public delete players" ON public.players FOR DELETE USING (false)';
   END IF;
 END $$;
 
